@@ -1,0 +1,3 @@
+web/drift_worker.js linguist-vendored
+web/sqlite3.wasm linguist-vendored binary
+lib/**/*.g.dart linguist-generated
