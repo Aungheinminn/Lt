@@ -46,7 +46,10 @@ class SettingsScreen extends ConsumerWidget {
               ),
               SwitchListTile(
                 title: const Text('Speak translation'),
-                subtitle: const Text('Read each translated line out loud'),
+                subtitle: const Text(
+                  'Read each translated line out loud. The mic pauses while it speaks; '
+                  'use headphones to keep talking over it.',
+                ),
                 value: settings.speakTranslation,
                 onChanged: controller.setSpeakTranslation,
               ),

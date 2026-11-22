@@ -49,6 +49,9 @@ dependencies:
   uuid: ^4.6.0
   intl: ^0.20.3
   http: ^1.6.0
+  flutter_foreground_task: ^11.0.3
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_windows_audio: ^1.0.9
 
 dev_dependencies:
   flutter_test:

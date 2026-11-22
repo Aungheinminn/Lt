@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -38,6 +39,34 @@ class OpenAiTextClient {
       );
     }
     return extractOutputText(body ?? const {}).trim();
+  }
+
+  static const speechModel = 'gpt-4o-mini-tts';
+  static const speechVoice = 'marin';
+
+  /// MP3 audio of [text] spoken aloud.
+  Future<Uint8List> speech(String text) async {
+    final res = await _http.post(
+      Uri.parse('https://api.openai.com/v1/audio/speech'),
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': speechModel,
+        'voice': speechVoice,
+        'input': text,
+        'response_format': 'mp3',
+      }),
+    );
+    if (res.statusCode != 200) {
+      final err = _decode(res.bodyBytes)?['error'] as Map<String, dynamic>?;
+      throw OpenAiException(
+        err?['message'] as String? ?? 'Speech request failed (${res.statusCode})',
+        code: err?['code'] as String?,
+      );
+    }
+    return res.bodyBytes;
   }
 
   void close() => _http.close();

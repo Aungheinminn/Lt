@@ -204,6 +204,27 @@ class _LiveViewState extends ConsumerState<_LiveView> {
           ),
         ),
         LinearProgressIndicator(value: stopping ? null : s.level, minHeight: 3),
+        if (s.reconnecting)
+          Container(
+            width: double.infinity,
+            color: theme.colorScheme.tertiaryContainer,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Connection lost. Still recording; sentences will be translated when it reconnects.',
+                    style: TextStyle(color: theme.colorScheme.onTertiaryContainer),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: lines.isEmpty
               ? Center(
