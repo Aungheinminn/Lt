@@ -830,8 +830,8 @@ class Line extends DataClass implements Insertable<Line> {
   final int id;
   final String sessionId;
 
-  /// OpenAI Realtime `item_id`. Events for a line arrive out of order, so
-  /// every update is keyed on this.
+  /// Segment key assigned when speech starts, before OpenAI has an item id.
+  /// Events for a line arrive out of order, so every update is keyed on this.
   final String itemId;
 
   /// Offset into the session's audio file; same clock as `audio_start_ms`.

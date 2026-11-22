@@ -6,6 +6,12 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Which app to build
+        type: choice
+        default: all
+        options: [all, macos, windows, android]
 
 permissions:
   contents: write
@@ -29,6 +35,7 @@ jobs:
 
   android:
     needs: version
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'android'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -69,6 +76,7 @@ jobs:
 
   macos:
     needs: version
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'macos'
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -92,6 +100,7 @@ jobs:
 
   windows:
     needs: version
+    if: github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:

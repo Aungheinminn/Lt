@@ -16,11 +16,12 @@ Future<void> insertSampleSession(AppDatabase db) async {
   ];
   var i = 0;
   for (final (start, end, original, translated) in lines) {
-    await db.upsertLine(
+    final item = 'seg_${i++}';
+    await db.createLine(id, item, start);
+    await db.updateLine(
       id,
-      'item_${i++}',
+      item,
       LinesCompanion(
-        startMs: Value(start),
         endMs: Value(end),
         originalText: Value(original),
         translatedText: Value(translated),

@@ -77,14 +77,33 @@ class AppDatabase extends _$AppDatabase {
     return (delete(sessions)..where((s) => s.id.equals(id))).go();
   }
 
-  Future<void> upsertLine(String sessionId, String itemId, LinesCompanion data) {
-    return into(lines).insert(
-      data.copyWith(sessionId: Value(sessionId), itemId: Value(itemId)),
-      onConflict: DoUpdate(
-        (_) => data,
-        target: [lines.sessionId, lines.itemId],
-      ),
-    );
+  Future<void> createLine(String sessionId, String itemId, int startMs) {
+    return into(lines).insert(LinesCompanion.insert(
+      sessionId: sessionId,
+      itemId: itemId,
+      startMs: startMs,
+    ));
+  }
+
+  /// Merges [data] into an existing line. A line that was already deleted
+  /// (e.g. discarded as noise) is left alone.
+  Future<void> updateLine(String sessionId, String itemId, LinesCompanion data) {
+    return (update(lines)
+          ..where((l) => l.sessionId.equals(sessionId) & l.itemId.equals(itemId)))
+        .write(data);
+  }
+
+  Future<void> deleteLine(String sessionId, String itemId) {
+    return (delete(lines)
+          ..where((l) => l.sessionId.equals(sessionId) & l.itemId.equals(itemId)))
+        .go();
+  }
+
+  Future<List<Line>> linesFor(String sessionId) {
+    return (select(lines)
+          ..where((l) => l.sessionId.equals(sessionId))
+          ..orderBy([(l) => OrderingTerm.asc(l.startMs)]))
+        .get();
   }
 
   /// Sessions left in `recording` or `finalizing` mean the app was killed

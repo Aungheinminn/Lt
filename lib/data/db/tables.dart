@@ -26,8 +26,8 @@ class Lines extends Table {
   TextColumn get sessionId =>
       text().references(Sessions, #id, onDelete: KeyAction.cascade)();
 
-  /// OpenAI Realtime `item_id`. Events for a line arrive out of order, so
-  /// every update is keyed on this.
+  /// Segment key assigned when speech starts, before OpenAI has an item id.
+  /// Events for a line arrive out of order, so every update is keyed on this.
   TextColumn get itemId => text()();
 
   /// Offset into the session's audio file; same clock as `audio_start_ms`.

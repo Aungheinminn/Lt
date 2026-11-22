@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
+import '../../session/session_storage.dart';
 
 class SessionScreen extends ConsumerWidget {
   const SessionScreen({super.key, required this.sessionId});
@@ -51,8 +52,8 @@ class SessionScreen extends ConsumerWidget {
                   ],
                 ),
               );
-              if (ok == true && context.mounted) {
-                await db.deleteSession(sessionId);
+              if (ok == true && session != null && context.mounted) {
+                await deleteSessionWithAudio(db, session);
                 if (context.mounted) context.go('/history');
               }
             },

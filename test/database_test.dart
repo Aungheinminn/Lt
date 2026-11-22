@@ -11,11 +11,9 @@ void main() {
 
   test('line events arriving out of order merge into one row', () async {
     await db.createSession(id: 's1', sourceLang: 'en', targetLang: 'my');
-    await db.upsertLine('s1', 'item_a', const LinesCompanion(startMs: Value(1200)));
-    await db.upsertLine('s1', 'item_a',
-        const LinesCompanion(startMs: Value(1200), translatedText: Value('မင်္ဂလာပါ')));
-    await db.upsertLine('s1', 'item_a',
-        const LinesCompanion(startMs: Value(1200), originalText: Value('Hello')));
+    await db.createLine('s1', 'seg_0', 1200);
+    await db.updateLine('s1', 'seg_0', const LinesCompanion(translatedText: Value('မင်္ဂလာပါ')));
+    await db.updateLine('s1', 'seg_0', const LinesCompanion(originalText: Value('Hello')));
 
     final lines = await db.watchLines('s1').first;
     expect(lines, hasLength(1));
@@ -23,9 +21,18 @@ void main() {
     expect(lines.single.translatedText, 'မင်္ဂလာပါ');
   });
 
+  test('updating a deleted line is a no-op', () async {
+    await db.createSession(id: 's1', sourceLang: 'en', targetLang: 'my');
+    await db.createLine('s1', 'seg_0', 0);
+    await db.deleteLine('s1', 'seg_0');
+    await db.updateLine('s1', 'seg_0', const LinesCompanion(endMs: Value(500)));
+
+    expect(await db.linesFor('s1'), isEmpty);
+  });
+
   test('deleting a session removes its lines', () async {
     await db.createSession(id: 's1', sourceLang: 'en', targetLang: 'my');
-    await db.upsertLine('s1', 'item_a', const LinesCompanion(startMs: Value(0)));
+    await db.createLine('s1', 'seg_0', 0);
     await db.deleteSession('s1');
 
     expect(await db.select(db.lines).get(), isEmpty);
