@@ -13,10 +13,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) await m.addColumn(sessions, sessions.mode);
+        },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
         },
@@ -57,6 +61,7 @@ class AppDatabase extends _$AppDatabase {
     required String id,
     required String sourceLang,
     required String targetLang,
+    SessionMode mode = SessionMode.captions,
     String? audioPath,
   }) {
     return into(sessions).insert(SessionsCompanion.insert(
@@ -65,6 +70,7 @@ class AppDatabase extends _$AppDatabase {
       targetLang: targetLang,
       createdAt: DateTime.now(),
       status: SessionStatus.recording,
+      mode: Value(mode),
       audioPath: Value(audioPath),
     ));
   }

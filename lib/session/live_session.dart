@@ -18,6 +18,7 @@ import '../openai/openai_error.dart';
 import '../openai/text_client.dart';
 import '../openai/transcription_client.dart';
 import 'background_recording.dart';
+import 'interpreter_engine.dart';
 import 'session_storage.dart';
 import 'translation_speaker.dart';
 
@@ -98,6 +99,8 @@ class LiveSessionController extends Notifier<LiveState> {
   OpenAiTextClient? _text;
   Translator? _translator;
   TranslationSpeaker? _speaker;
+  InterpreterEngine? _interpreter;
+  SessionMode _mode = SessionMode.captions;
   AudioFileSink? _sink;
   Vad? _vad;
 
@@ -162,10 +165,14 @@ class LiveSessionController extends Notifier<LiveState> {
         throw OpenAiException(_micPermissionHelp());
       }
 
-      _attach(await TranscriptionClient.connect(apiKey: key, language: _sourceCode));
+      _mode = settings.mode;
+      final captions = _mode == SessionMode.captions;
+      if (captions) {
+        _attach(await TranscriptionClient.connect(apiKey: key, language: _sourceCode));
+      }
       _text = OpenAiTextClient(key);
       _translator = Translator(_text!);
-      if (settings.speakTranslation) _speaker = TranslationSpeaker(_text!);
+      if (captions && settings.speakTranslation) _speaker = TranslationSpeaker(_text!);
 
       final id = _sessionId = const Uuid().v4();
       _sink = settings.saveAudio ? await openAudioFileSink(id) : null;
@@ -173,8 +180,21 @@ class LiveSessionController extends Notifier<LiveState> {
         id: id,
         sourceLang: settings.sourceLang,
         targetLang: settings.targetLang,
+        mode: _mode,
         audioPath: _sink?.relativePath,
       );
+      if (!captions) {
+        final interpreter = _interpreter = InterpreterEngine(
+          db: _db,
+          sessionId: id,
+          apiKey: key,
+          targetLanguage: settings.targetLang,
+          onReconnecting: (r) => state = state.copyWith(reconnecting: r),
+          onError: (m) => state = state.copyWith(error: m),
+          onFatal: _fail,
+        );
+        await interpreter.connect();
+      }
 
       _vad = Vad();
       _bytes = 0;
@@ -213,6 +233,8 @@ class LiveSessionController extends Notifier<LiveState> {
     for (final e in _vad?.flush() ?? const <VadEvent>[]) {
       _handleVad(e);
     }
+    final interpreter = _interpreter;
+    if (interpreter != null) await interpreter.finish();
 
     // Give in-flight transcripts and translations a moment to land. A
     // reconnect still in progress keeps going during this wait.
@@ -228,6 +250,14 @@ class LiveSessionController extends Notifier<LiveState> {
     final translator = _translator;
     await _teardown(keepText: true);
 
+    if (interpreter != null) {
+      // Speech the model produced no text for leaves empty lines behind.
+      for (final l in await _db.linesFor(id)) {
+        if (l.originalText == null && l.translatedText == null) {
+          await _db.deleteLine(id, l.itemId);
+        }
+      }
+    }
     final lines = await _db.linesFor(id);
     if (lines.isEmpty) {
       await _discardIfEmpty(id);
@@ -264,7 +294,9 @@ class LiveSessionController extends Notifier<LiveState> {
     final vad = _vad!;
     // While the app speaks a translation, the mic would pick it up and
     // transcribe it. The file still gets the real audio.
-    final heard = (_speaker?.suppressMic ?? false) ? Uint8List(pcm.length) : pcm;
+    final suppress = (_speaker?.suppressMic ?? false) || (_interpreter?.suppressMic ?? false);
+    final heard = suppress ? Uint8List(pcm.length) : pcm;
+    _interpreter?.addAudio(heard);
     for (final e in vad.process(heard)) {
       _handleVad(e);
     }
@@ -278,6 +310,11 @@ class LiveSessionController extends Notifier<LiveState> {
   void _handleVad(VadEvent e) {
     final id = _sessionId;
     if (id == null) return;
+    final interpreter = _interpreter;
+    if (interpreter != null) {
+      _handleVadInterpreter(interpreter, e);
+      return;
+    }
     switch (e) {
       case VadSpeechStart(:final startMs, :final preRoll):
         final seg = 'seg_${_segCounter++}';
@@ -307,6 +344,22 @@ class LiveSessionController extends Notifier<LiveState> {
           client.commit();
           if (!_itemToSeg.containsValue(seg)) _awaitingItemId.add(seg);
         }
+    }
+  }
+
+  void _handleVadInterpreter(InterpreterEngine interpreter, VadEvent e) {
+    switch (e) {
+      case VadSpeechStart(:final startMs):
+        final seg = 'seg_${_segCounter++}';
+        _currentSeg = seg;
+        interpreter.lineStarted(seg, startMs);
+      case VadAudio():
+        break;
+      case VadSpeechEnd(:final endMs, :final voicedMs):
+        final seg = _currentSeg;
+        _currentSeg = null;
+        if (seg == null) return;
+        voicedMs < _minVoicedMs ? interpreter.lineDiscarded(seg) : interpreter.lineEnded(seg, endMs);
     }
   }
 
@@ -533,6 +586,8 @@ class LiveSessionController extends Notifier<LiveState> {
     await sink?.close();
     await _speaker?.dispose();
     _speaker = null;
+    await _interpreter?.dispose();
+    _interpreter = null;
     if (!keepText) {
       _text?.close();
       _text = null;

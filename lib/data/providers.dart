@@ -45,6 +45,7 @@ class SettingsController extends Notifier<AppSettings> {
   static const _saveAudio = 'save_audio';
   static const _speak = 'speak_translation';
   static const _retention = 'audio_retention_days';
+  static const _mode = 'live_mode';
 
   SharedPreferences get _prefs => ref.read(sharedPreferencesProvider);
 
@@ -59,6 +60,7 @@ class SettingsController extends Notifier<AppSettings> {
       saveAudio: _prefs.getBool(_saveAudio) ?? d.saveAudio,
       speakTranslation: _prefs.getBool(_speak) ?? d.speakTranslation,
       audioRetentionDays: _prefs.getInt(_retention) ?? d.audioRetentionDays,
+      mode: SessionMode.values.asNameMap()[_prefs.getString(_mode)] ?? d.mode,
     );
   }
 
@@ -84,6 +86,11 @@ class SettingsController extends Notifier<AppSettings> {
   void setSpeakTranslation(bool v) {
     _prefs.setBool(_speak, v);
     state = state.copyWith(speakTranslation: v);
+  }
+
+  void setMode(SessionMode v) {
+    _prefs.setString(_mode, v.name);
+    state = state.copyWith(mode: v);
   }
 
   void setAudioRetentionDays(int v) {

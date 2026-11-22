@@ -81,6 +81,16 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         type: DriftSqlType.string,
         requiredDuringInsert: true,
       ).withConverter<SessionStatus>($SessionsTable.$converterstatus);
+  @override
+  late final GeneratedColumnWithTypeConverter<SessionMode, String> mode =
+      GeneratedColumn<String>(
+        'mode',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: Constant(SessionMode.captions.name),
+      ).withConverter<SessionMode>($SessionsTable.$convertermode);
   static const VerificationMeta _starredMeta = const VerificationMeta(
     'starred',
   );
@@ -128,6 +138,7 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     createdAt,
     durationMs,
     status,
+    mode,
     starred,
     audioPath,
     audioBytes,
@@ -242,6 +253,12 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
           data['${effectivePrefix}status'],
         )!,
       ),
+      mode: $SessionsTable.$convertermode.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}mode'],
+        )!,
+      ),
       starred: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}starred'],
@@ -264,6 +281,8 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
 
   static JsonTypeConverter2<SessionStatus, String, String> $converterstatus =
       const EnumNameConverter<SessionStatus>(SessionStatus.values);
+  static JsonTypeConverter2<SessionMode, String, String> $convertermode =
+      const EnumNameConverter<SessionMode>(SessionMode.values);
 }
 
 class Session extends DataClass implements Insertable<Session> {
@@ -274,6 +293,7 @@ class Session extends DataClass implements Insertable<Session> {
   final DateTime createdAt;
   final int durationMs;
   final SessionStatus status;
+  final SessionMode mode;
   final bool starred;
 
   /// Relative to the app support directory, e.g. `audio/<id>.wav`. The
@@ -288,6 +308,7 @@ class Session extends DataClass implements Insertable<Session> {
     required this.createdAt,
     required this.durationMs,
     required this.status,
+    required this.mode,
     required this.starred,
     this.audioPath,
     required this.audioBytes,
@@ -306,6 +327,9 @@ class Session extends DataClass implements Insertable<Session> {
         $SessionsTable.$converterstatus.toSql(status),
       );
     }
+    {
+      map['mode'] = Variable<String>($SessionsTable.$convertermode.toSql(mode));
+    }
     map['starred'] = Variable<bool>(starred);
     if (!nullToAbsent || audioPath != null) {
       map['audio_path'] = Variable<String>(audioPath);
@@ -323,6 +347,7 @@ class Session extends DataClass implements Insertable<Session> {
       createdAt: Value(createdAt),
       durationMs: Value(durationMs),
       status: Value(status),
+      mode: Value(mode),
       starred: Value(starred),
       audioPath: audioPath == null && nullToAbsent
           ? const Value.absent()
@@ -346,6 +371,9 @@ class Session extends DataClass implements Insertable<Session> {
       status: $SessionsTable.$converterstatus.fromJson(
         serializer.fromJson<String>(json['status']),
       ),
+      mode: $SessionsTable.$convertermode.fromJson(
+        serializer.fromJson<String>(json['mode']),
+      ),
       starred: serializer.fromJson<bool>(json['starred']),
       audioPath: serializer.fromJson<String?>(json['audioPath']),
       audioBytes: serializer.fromJson<int>(json['audioBytes']),
@@ -364,6 +392,9 @@ class Session extends DataClass implements Insertable<Session> {
       'status': serializer.toJson<String>(
         $SessionsTable.$converterstatus.toJson(status),
       ),
+      'mode': serializer.toJson<String>(
+        $SessionsTable.$convertermode.toJson(mode),
+      ),
       'starred': serializer.toJson<bool>(starred),
       'audioPath': serializer.toJson<String?>(audioPath),
       'audioBytes': serializer.toJson<int>(audioBytes),
@@ -378,6 +409,7 @@ class Session extends DataClass implements Insertable<Session> {
     DateTime? createdAt,
     int? durationMs,
     SessionStatus? status,
+    SessionMode? mode,
     bool? starred,
     Value<String?> audioPath = const Value.absent(),
     int? audioBytes,
@@ -389,6 +421,7 @@ class Session extends DataClass implements Insertable<Session> {
     createdAt: createdAt ?? this.createdAt,
     durationMs: durationMs ?? this.durationMs,
     status: status ?? this.status,
+    mode: mode ?? this.mode,
     starred: starred ?? this.starred,
     audioPath: audioPath.present ? audioPath.value : this.audioPath,
     audioBytes: audioBytes ?? this.audioBytes,
@@ -408,6 +441,7 @@ class Session extends DataClass implements Insertable<Session> {
           ? data.durationMs.value
           : this.durationMs,
       status: data.status.present ? data.status.value : this.status,
+      mode: data.mode.present ? data.mode.value : this.mode,
       starred: data.starred.present ? data.starred.value : this.starred,
       audioPath: data.audioPath.present ? data.audioPath.value : this.audioPath,
       audioBytes: data.audioBytes.present
@@ -426,6 +460,7 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('createdAt: $createdAt, ')
           ..write('durationMs: $durationMs, ')
           ..write('status: $status, ')
+          ..write('mode: $mode, ')
           ..write('starred: $starred, ')
           ..write('audioPath: $audioPath, ')
           ..write('audioBytes: $audioBytes')
@@ -442,6 +477,7 @@ class Session extends DataClass implements Insertable<Session> {
     createdAt,
     durationMs,
     status,
+    mode,
     starred,
     audioPath,
     audioBytes,
@@ -457,6 +493,7 @@ class Session extends DataClass implements Insertable<Session> {
           other.createdAt == this.createdAt &&
           other.durationMs == this.durationMs &&
           other.status == this.status &&
+          other.mode == this.mode &&
           other.starred == this.starred &&
           other.audioPath == this.audioPath &&
           other.audioBytes == this.audioBytes);
@@ -470,6 +507,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<DateTime> createdAt;
   final Value<int> durationMs;
   final Value<SessionStatus> status;
+  final Value<SessionMode> mode;
   final Value<bool> starred;
   final Value<String?> audioPath;
   final Value<int> audioBytes;
@@ -482,6 +520,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.createdAt = const Value.absent(),
     this.durationMs = const Value.absent(),
     this.status = const Value.absent(),
+    this.mode = const Value.absent(),
     this.starred = const Value.absent(),
     this.audioPath = const Value.absent(),
     this.audioBytes = const Value.absent(),
@@ -495,6 +534,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     required DateTime createdAt,
     this.durationMs = const Value.absent(),
     required SessionStatus status,
+    this.mode = const Value.absent(),
     this.starred = const Value.absent(),
     this.audioPath = const Value.absent(),
     this.audioBytes = const Value.absent(),
@@ -512,6 +552,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<DateTime>? createdAt,
     Expression<int>? durationMs,
     Expression<String>? status,
+    Expression<String>? mode,
     Expression<bool>? starred,
     Expression<String>? audioPath,
     Expression<int>? audioBytes,
@@ -525,6 +566,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (createdAt != null) 'created_at': createdAt,
       if (durationMs != null) 'duration_ms': durationMs,
       if (status != null) 'status': status,
+      if (mode != null) 'mode': mode,
       if (starred != null) 'starred': starred,
       if (audioPath != null) 'audio_path': audioPath,
       if (audioBytes != null) 'audio_bytes': audioBytes,
@@ -540,6 +582,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Value<DateTime>? createdAt,
     Value<int>? durationMs,
     Value<SessionStatus>? status,
+    Value<SessionMode>? mode,
     Value<bool>? starred,
     Value<String?>? audioPath,
     Value<int>? audioBytes,
@@ -553,6 +596,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       createdAt: createdAt ?? this.createdAt,
       durationMs: durationMs ?? this.durationMs,
       status: status ?? this.status,
+      mode: mode ?? this.mode,
       starred: starred ?? this.starred,
       audioPath: audioPath ?? this.audioPath,
       audioBytes: audioBytes ?? this.audioBytes,
@@ -586,6 +630,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
         $SessionsTable.$converterstatus.toSql(status.value),
       );
     }
+    if (mode.present) {
+      map['mode'] = Variable<String>(
+        $SessionsTable.$convertermode.toSql(mode.value),
+      );
+    }
     if (starred.present) {
       map['starred'] = Variable<bool>(starred.value);
     }
@@ -611,6 +660,7 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('createdAt: $createdAt, ')
           ..write('durationMs: $durationMs, ')
           ..write('status: $status, ')
+          ..write('mode: $mode, ')
           ..write('starred: $starred, ')
           ..write('audioPath: $audioPath, ')
           ..write('audioBytes: $audioBytes, ')
@@ -1126,6 +1176,7 @@ typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
   required DateTime createdAt,
   Value<int> durationMs,
   required SessionStatus status,
+  Value<SessionMode> mode,
   Value<bool> starred,
   Value<String?> audioPath,
   Value<int> audioBytes,
@@ -1139,6 +1190,7 @@ typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<DateTime> createdAt,
   Value<int> durationMs,
   Value<SessionStatus> status,
+  Value<SessionMode> mode,
   Value<bool> starred,
   Value<String?> audioPath,
   Value<int> audioBytes,
@@ -1213,6 +1265,12 @@ class $$SessionsTableFilterComposer
     column: $table.status,
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
+
+  ColumnWithTypeConverterFilters<SessionMode, SessionMode, String> get mode =>
+      $composableBuilder(
+        column: $table.mode,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   ColumnFilters<bool> get starred => $composableBuilder(
     column: $table.starred,
@@ -1299,6 +1357,11 @@ class $$SessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get mode => $composableBuilder(
+    column: $table.mode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get starred => $composableBuilder(
     column: $table.starred,
     builder: (column) => ColumnOrderings(column),
@@ -1350,6 +1413,9 @@ class $$SessionsTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<SessionStatus, String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<SessionMode, String> get mode =>
+      $composableBuilder(column: $table.mode, builder: (column) => column);
 
   GeneratedColumn<bool> get starred =>
       $composableBuilder(column: $table.starred, builder: (column) => column);
@@ -1423,6 +1489,7 @@ class $$SessionsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> durationMs = const Value.absent(),
                 Value<SessionStatus> status = const Value.absent(),
+                Value<SessionMode> mode = const Value.absent(),
                 Value<bool> starred = const Value.absent(),
                 Value<String?> audioPath = const Value.absent(),
                 Value<int> audioBytes = const Value.absent(),
@@ -1435,6 +1502,7 @@ class $$SessionsTableTableManager
                 createdAt: createdAt,
                 durationMs: durationMs,
                 status: status,
+                mode: mode,
                 starred: starred,
                 audioPath: audioPath,
                 audioBytes: audioBytes,
@@ -1449,6 +1517,7 @@ class $$SessionsTableTableManager
                 required DateTime createdAt,
                 Value<int> durationMs = const Value.absent(),
                 required SessionStatus status,
+                Value<SessionMode> mode = const Value.absent(),
                 Value<bool> starred = const Value.absent(),
                 Value<String?> audioPath = const Value.absent(),
                 Value<int> audioBytes = const Value.absent(),
@@ -1461,6 +1530,7 @@ class $$SessionsTableTableManager
                 createdAt: createdAt,
                 durationMs: durationMs,
                 status: status,
+                mode: mode,
                 starred: starred,
                 audioPath: audioPath,
                 audioBytes: audioBytes,

@@ -54,7 +54,11 @@ class _SessionTile extends StatelessWidget {
     final when = DateFormat.yMMMd().add_jm().format(s.createdAt);
 
     return ListTile(
-      leading: Icon(s.starred ? Icons.star : Icons.graphic_eq),
+      leading: Icon(s.starred
+          ? Icons.star
+          : s.mode == SessionMode.interpreter
+              ? Icons.record_voice_over_outlined
+              : Icons.subtitles_outlined),
       title: Text(s.title),
       subtitle: Text('$langs · $minutes min · $when'),
       trailing: s.status == SessionStatus.interrupted

@@ -30,6 +30,14 @@ void main() {
     expect(await db.linesFor('s1'), isEmpty);
   });
 
+  test('sessions record their mode, defaulting to captions', () async {
+    await db.createSession(id: 'a', sourceLang: 'en', targetLang: 'my');
+    await db.createSession(id: 'b', sourceLang: 'en', targetLang: 'my', mode: SessionMode.interpreter);
+
+    final sessions = {for (final s in await db.select(db.sessions).get()) s.id: s.mode};
+    expect(sessions, {'a': SessionMode.captions, 'b': SessionMode.interpreter});
+  });
+
   test('deleting a session removes its lines', () async {
     await db.createSession(id: 's1', sourceLang: 'en', targetLang: 'my');
     await db.createLine('s1', 'seg_0', 0);

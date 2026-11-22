@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../db/tables.dart';
+
 @immutable
 class AppSettings {
   const AppSettings({
@@ -9,6 +11,7 @@ class AppSettings {
     this.saveAudio = true,
     this.speakTranslation = false,
     this.audioRetentionDays = 0,
+    this.mode = SessionMode.captions,
   });
 
   final ThemeMode themeMode;
@@ -19,6 +22,7 @@ class AppSettings {
 
   /// 0 keeps audio forever.
   final int audioRetentionDays;
+  final SessionMode mode;
 
   AppSettings copyWith({
     ThemeMode? themeMode,
@@ -27,6 +31,7 @@ class AppSettings {
     bool? saveAudio,
     bool? speakTranslation,
     int? audioRetentionDays,
+    SessionMode? mode,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -35,6 +40,7 @@ class AppSettings {
       saveAudio: saveAudio ?? this.saveAudio,
       speakTranslation: speakTranslation ?? this.speakTranslation,
       audioRetentionDays: audioRetentionDays ?? this.audioRetentionDays,
+      mode: mode ?? this.mode,
     );
   }
 }

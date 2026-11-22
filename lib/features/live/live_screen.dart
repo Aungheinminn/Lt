@@ -97,7 +97,32 @@ class _IdleView extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 20),
+            SegmentedButton<SessionMode>(
+              segments: const [
+                ButtonSegment(
+                  value: SessionMode.captions,
+                  icon: Icon(Icons.subtitles_outlined),
+                  label: Text('Captions'),
+                ),
+                ButtonSegment(
+                  value: SessionMode.interpreter,
+                  icon: Icon(Icons.record_voice_over_outlined),
+                  label: Text('Interpreter'),
+                ),
+              ],
+              selected: {settings.mode},
+              onSelectionChanged: connecting ? null : (s) => controller.setMode(s.first),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              settings.mode == SessionMode.captions
+                  ? 'Sentence-by-sentence text with exact timing. Translations can be read aloud.'
+                  : 'Hear the translation as you speak, with the lowest delay. Text is approximate.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 32),
             Center(
               child: SizedBox.square(
                 dimension: 120,
@@ -189,9 +214,13 @@ class _LiveViewState extends ConsumerState<_LiveView> {
                 style: theme.textTheme.titleSmall,
               ),
               const SizedBox(width: 12),
-              Text(
-                '${languageFor(settings.sourceLang).name} → ${languageFor(settings.targetLang).name}',
-                style: theme.textTheme.bodySmall,
+              Flexible(
+                child: Text(
+                  '${settings.mode == SessionMode.interpreter ? 'Interpreter · ' : ''}'
+                  '${languageFor(settings.sourceLang).name} → ${languageFor(settings.targetLang).name}',
+                  style: theme.textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const Spacer(),
               Text(

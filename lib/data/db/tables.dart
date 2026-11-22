@@ -2,6 +2,10 @@ import 'package:drift/drift.dart';
 
 enum SessionStatus { recording, finalizing, complete, interrupted }
 
+/// Captions: sentence-by-sentence transcription, then text translation.
+/// Interpreter: continuous speech-to-speech translation.
+enum SessionMode { captions, interpreter }
+
 class Sessions extends Table {
   TextColumn get id => text()();
   TextColumn get title => text().withDefault(const Constant('Untitled session'))();
@@ -10,6 +14,8 @@ class Sessions extends Table {
   DateTimeColumn get createdAt => dateTime()();
   IntColumn get durationMs => integer().withDefault(const Constant(0))();
   TextColumn get status => textEnum<SessionStatus>()();
+  TextColumn get mode =>
+      textEnum<SessionMode>().withDefault(Constant(SessionMode.captions.name))();
   BoolColumn get starred => boolean().withDefault(const Constant(false))();
 
   /// Relative to the app support directory, e.g. `audio/<id>.wav`. The
