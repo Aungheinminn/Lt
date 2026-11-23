@@ -6,9 +6,31 @@ import 'package:http/http.dart' as http;
 import 'openai_error.dart';
 
 /// Minimal client for the Responses API, used for translation and titles.
+class TextUsage {
+  const TextUsage({required this.input, required this.cached, required this.output});
+
+  final int input;
+  final int cached;
+  final int output;
+
+  static TextUsage? fromResponse(Map<String, dynamic>? body) {
+    final u = body?['usage'];
+    if (u is! Map) return null;
+    final details = u['input_tokens_details'];
+    return TextUsage(
+      input: (u['input_tokens'] as num?)?.toInt() ?? 0,
+      cached: details is Map ? (details['cached_tokens'] as num?)?.toInt() ?? 0 : 0,
+      output: (u['output_tokens'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class OpenAiTextClient {
-  OpenAiTextClient(this._apiKey, {http.Client? client})
+  OpenAiTextClient(this._apiKey, {http.Client? client, this.onUsage})
       : _http = client ?? http.Client();
+
+  /// Called with the billed tokens of every successful request.
+  final void Function(TextUsage usage)? onUsage;
 
   static const model = 'gpt-5.4-mini';
   static final _uri = Uri.parse('https://api.openai.com/v1/responses');
@@ -38,6 +60,8 @@ class OpenAiTextClient {
         code: err?['code'] as String?,
       );
     }
+    final usage = TextUsage.fromResponse(body);
+    if (usage != null) onUsage?.call(usage);
     return extractOutputText(body ?? const {}).trim();
   }
 

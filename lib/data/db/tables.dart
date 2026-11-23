@@ -23,6 +23,14 @@ class Sessions extends Table {
   TextColumn get audioPath => text().nullable()();
   IntColumn get audioBytes => integer().withDefault(const Constant(0))();
 
+  /// OpenAI usage for cost estimates. Null on sessions recorded before usage
+  /// was tracked.
+  RealColumn get transcribeSeconds => real().nullable()();
+  IntColumn get textInputTokens => integer().withDefault(const Constant(0))();
+  IntColumn get textCachedTokens => integer().withDefault(const Constant(0))();
+  IntColumn get textOutputTokens => integer().withDefault(const Constant(0))();
+  RealColumn get speechSeconds => real().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

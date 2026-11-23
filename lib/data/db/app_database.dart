@@ -13,13 +13,20 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
           if (from < 2) await m.addColumn(sessions, sessions.mode);
+          if (from < 3) {
+            await m.addColumn(sessions, sessions.transcribeSeconds);
+            await m.addColumn(sessions, sessions.textInputTokens);
+            await m.addColumn(sessions, sessions.textCachedTokens);
+            await m.addColumn(sessions, sessions.textOutputTokens);
+            await m.addColumn(sessions, sessions.speechSeconds);
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -72,7 +79,39 @@ class AppDatabase extends _$AppDatabase {
       status: SessionStatus.recording,
       mode: Value(mode),
       audioPath: Value(audioPath),
+      // Interpreter usage isn't tracked yet, so it shows no estimate.
+      transcribeSeconds: Value(mode == SessionMode.captions ? 0 : null),
     ));
+  }
+
+  /// Adds to a session's usage counters in place, so concurrent callbacks
+  /// don't overwrite each other.
+  Future<void> addUsage(
+    String id, {
+    double transcribeSeconds = 0,
+    int textInput = 0,
+    int textCached = 0,
+    int textOutput = 0,
+    double speechSeconds = 0,
+  }) {
+    return customUpdate(
+      'UPDATE sessions SET '
+      'transcribe_seconds = COALESCE(transcribe_seconds, 0) + ?, '
+      'text_input_tokens = text_input_tokens + ?, '
+      'text_cached_tokens = text_cached_tokens + ?, '
+      'text_output_tokens = text_output_tokens + ?, '
+      'speech_seconds = speech_seconds + ? '
+      'WHERE id = ?',
+      variables: [
+        Variable.withReal(transcribeSeconds),
+        Variable.withInt(textInput),
+        Variable.withInt(textCached),
+        Variable.withInt(textOutput),
+        Variable.withReal(speechSeconds),
+        Variable.withString(id),
+      ],
+      updates: {sessions},
+    );
   }
 
   Future<void> updateSession(String id, SessionsCompanion changes) {

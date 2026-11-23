@@ -11,9 +11,12 @@ import '../openai/text_client.dart';
 /// as soon as it is queued, so the next line is usually ready when the
 /// current one finishes.
 class TranslationSpeaker {
-  TranslationSpeaker(this._client);
+  TranslationSpeaker(this._client, {this.onSpoken});
 
   final OpenAiTextClient _client;
+
+  /// Length of each generated clip; speech is billed by audio produced.
+  final void Function(Duration length)? onSpoken;
   // Without session activation the player doesn't take audio focus, so
   // whatever else is playing (the speaker the user may be translating) goes on.
   final _player = AudioPlayer(handleAudioSessionActivation: false, handleInterruptions: false);
@@ -43,7 +46,8 @@ class TranslationSpeaker {
         if (bytes == null || _disposed) continue;
         final source = await mp3Source(bytes);
         try {
-          await _player.setAudioSource(source);
+          final length = await _player.setAudioSource(source);
+          if (length != null) onSpoken?.call(length);
           await _player.play();
           await _player.playerStateStream.firstWhere(
             (s) => s.processingState == ProcessingState.completed || !s.playing,

@@ -129,6 +129,66 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _transcribeSecondsMeta = const VerificationMeta(
+    'transcribeSeconds',
+  );
+  @override
+  late final GeneratedColumn<double> transcribeSeconds =
+      GeneratedColumn<double>(
+        'transcribe_seconds',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _textInputTokensMeta = const VerificationMeta(
+    'textInputTokens',
+  );
+  @override
+  late final GeneratedColumn<int> textInputTokens = GeneratedColumn<int>(
+    'text_input_tokens',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _textCachedTokensMeta = const VerificationMeta(
+    'textCachedTokens',
+  );
+  @override
+  late final GeneratedColumn<int> textCachedTokens = GeneratedColumn<int>(
+    'text_cached_tokens',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _textOutputTokensMeta = const VerificationMeta(
+    'textOutputTokens',
+  );
+  @override
+  late final GeneratedColumn<int> textOutputTokens = GeneratedColumn<int>(
+    'text_output_tokens',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _speechSecondsMeta = const VerificationMeta(
+    'speechSeconds',
+  );
+  @override
+  late final GeneratedColumn<double> speechSeconds = GeneratedColumn<double>(
+    'speech_seconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -142,6 +202,11 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
     starred,
     audioPath,
     audioBytes,
+    transcribeSeconds,
+    textInputTokens,
+    textCachedTokens,
+    textOutputTokens,
+    speechSeconds,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -214,6 +279,51 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         audioBytes.isAcceptableOrUnknown(data['audio_bytes']!, _audioBytesMeta),
       );
     }
+    if (data.containsKey('transcribe_seconds')) {
+      context.handle(
+        _transcribeSecondsMeta,
+        transcribeSeconds.isAcceptableOrUnknown(
+          data['transcribe_seconds']!,
+          _transcribeSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('text_input_tokens')) {
+      context.handle(
+        _textInputTokensMeta,
+        textInputTokens.isAcceptableOrUnknown(
+          data['text_input_tokens']!,
+          _textInputTokensMeta,
+        ),
+      );
+    }
+    if (data.containsKey('text_cached_tokens')) {
+      context.handle(
+        _textCachedTokensMeta,
+        textCachedTokens.isAcceptableOrUnknown(
+          data['text_cached_tokens']!,
+          _textCachedTokensMeta,
+        ),
+      );
+    }
+    if (data.containsKey('text_output_tokens')) {
+      context.handle(
+        _textOutputTokensMeta,
+        textOutputTokens.isAcceptableOrUnknown(
+          data['text_output_tokens']!,
+          _textOutputTokensMeta,
+        ),
+      );
+    }
+    if (data.containsKey('speech_seconds')) {
+      context.handle(
+        _speechSecondsMeta,
+        speechSeconds.isAcceptableOrUnknown(
+          data['speech_seconds']!,
+          _speechSecondsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -271,6 +381,26 @@ class $SessionsTable extends Sessions with TableInfo<$SessionsTable, Session> {
         DriftSqlType.int,
         data['${effectivePrefix}audio_bytes'],
       )!,
+      transcribeSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}transcribe_seconds'],
+      ),
+      textInputTokens: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}text_input_tokens'],
+      )!,
+      textCachedTokens: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}text_cached_tokens'],
+      )!,
+      textOutputTokens: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}text_output_tokens'],
+      )!,
+      speechSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}speech_seconds'],
+      )!,
     );
   }
 
@@ -300,6 +430,14 @@ class Session extends DataClass implements Insertable<Session> {
   /// absolute path changes on iOS updates and after a backup restore.
   final String? audioPath;
   final int audioBytes;
+
+  /// OpenAI usage for cost estimates. Null on sessions recorded before usage
+  /// was tracked.
+  final double? transcribeSeconds;
+  final int textInputTokens;
+  final int textCachedTokens;
+  final int textOutputTokens;
+  final double speechSeconds;
   const Session({
     required this.id,
     required this.title,
@@ -312,6 +450,11 @@ class Session extends DataClass implements Insertable<Session> {
     required this.starred,
     this.audioPath,
     required this.audioBytes,
+    this.transcribeSeconds,
+    required this.textInputTokens,
+    required this.textCachedTokens,
+    required this.textOutputTokens,
+    required this.speechSeconds,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -335,6 +478,13 @@ class Session extends DataClass implements Insertable<Session> {
       map['audio_path'] = Variable<String>(audioPath);
     }
     map['audio_bytes'] = Variable<int>(audioBytes);
+    if (!nullToAbsent || transcribeSeconds != null) {
+      map['transcribe_seconds'] = Variable<double>(transcribeSeconds);
+    }
+    map['text_input_tokens'] = Variable<int>(textInputTokens);
+    map['text_cached_tokens'] = Variable<int>(textCachedTokens);
+    map['text_output_tokens'] = Variable<int>(textOutputTokens);
+    map['speech_seconds'] = Variable<double>(speechSeconds);
     return map;
   }
 
@@ -353,6 +503,13 @@ class Session extends DataClass implements Insertable<Session> {
           ? const Value.absent()
           : Value(audioPath),
       audioBytes: Value(audioBytes),
+      transcribeSeconds: transcribeSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(transcribeSeconds),
+      textInputTokens: Value(textInputTokens),
+      textCachedTokens: Value(textCachedTokens),
+      textOutputTokens: Value(textOutputTokens),
+      speechSeconds: Value(speechSeconds),
     );
   }
 
@@ -377,6 +534,13 @@ class Session extends DataClass implements Insertable<Session> {
       starred: serializer.fromJson<bool>(json['starred']),
       audioPath: serializer.fromJson<String?>(json['audioPath']),
       audioBytes: serializer.fromJson<int>(json['audioBytes']),
+      transcribeSeconds: serializer.fromJson<double?>(
+        json['transcribeSeconds'],
+      ),
+      textInputTokens: serializer.fromJson<int>(json['textInputTokens']),
+      textCachedTokens: serializer.fromJson<int>(json['textCachedTokens']),
+      textOutputTokens: serializer.fromJson<int>(json['textOutputTokens']),
+      speechSeconds: serializer.fromJson<double>(json['speechSeconds']),
     );
   }
   @override
@@ -398,6 +562,11 @@ class Session extends DataClass implements Insertable<Session> {
       'starred': serializer.toJson<bool>(starred),
       'audioPath': serializer.toJson<String?>(audioPath),
       'audioBytes': serializer.toJson<int>(audioBytes),
+      'transcribeSeconds': serializer.toJson<double?>(transcribeSeconds),
+      'textInputTokens': serializer.toJson<int>(textInputTokens),
+      'textCachedTokens': serializer.toJson<int>(textCachedTokens),
+      'textOutputTokens': serializer.toJson<int>(textOutputTokens),
+      'speechSeconds': serializer.toJson<double>(speechSeconds),
     };
   }
 
@@ -413,6 +582,11 @@ class Session extends DataClass implements Insertable<Session> {
     bool? starred,
     Value<String?> audioPath = const Value.absent(),
     int? audioBytes,
+    Value<double?> transcribeSeconds = const Value.absent(),
+    int? textInputTokens,
+    int? textCachedTokens,
+    int? textOutputTokens,
+    double? speechSeconds,
   }) => Session(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -425,6 +599,13 @@ class Session extends DataClass implements Insertable<Session> {
     starred: starred ?? this.starred,
     audioPath: audioPath.present ? audioPath.value : this.audioPath,
     audioBytes: audioBytes ?? this.audioBytes,
+    transcribeSeconds: transcribeSeconds.present
+        ? transcribeSeconds.value
+        : this.transcribeSeconds,
+    textInputTokens: textInputTokens ?? this.textInputTokens,
+    textCachedTokens: textCachedTokens ?? this.textCachedTokens,
+    textOutputTokens: textOutputTokens ?? this.textOutputTokens,
+    speechSeconds: speechSeconds ?? this.speechSeconds,
   );
   Session copyWithCompanion(SessionsCompanion data) {
     return Session(
@@ -447,6 +628,21 @@ class Session extends DataClass implements Insertable<Session> {
       audioBytes: data.audioBytes.present
           ? data.audioBytes.value
           : this.audioBytes,
+      transcribeSeconds: data.transcribeSeconds.present
+          ? data.transcribeSeconds.value
+          : this.transcribeSeconds,
+      textInputTokens: data.textInputTokens.present
+          ? data.textInputTokens.value
+          : this.textInputTokens,
+      textCachedTokens: data.textCachedTokens.present
+          ? data.textCachedTokens.value
+          : this.textCachedTokens,
+      textOutputTokens: data.textOutputTokens.present
+          ? data.textOutputTokens.value
+          : this.textOutputTokens,
+      speechSeconds: data.speechSeconds.present
+          ? data.speechSeconds.value
+          : this.speechSeconds,
     );
   }
 
@@ -463,7 +659,12 @@ class Session extends DataClass implements Insertable<Session> {
           ..write('mode: $mode, ')
           ..write('starred: $starred, ')
           ..write('audioPath: $audioPath, ')
-          ..write('audioBytes: $audioBytes')
+          ..write('audioBytes: $audioBytes, ')
+          ..write('transcribeSeconds: $transcribeSeconds, ')
+          ..write('textInputTokens: $textInputTokens, ')
+          ..write('textCachedTokens: $textCachedTokens, ')
+          ..write('textOutputTokens: $textOutputTokens, ')
+          ..write('speechSeconds: $speechSeconds')
           ..write(')'))
         .toString();
   }
@@ -481,6 +682,11 @@ class Session extends DataClass implements Insertable<Session> {
     starred,
     audioPath,
     audioBytes,
+    transcribeSeconds,
+    textInputTokens,
+    textCachedTokens,
+    textOutputTokens,
+    speechSeconds,
   );
   @override
   bool operator ==(Object other) =>
@@ -496,7 +702,12 @@ class Session extends DataClass implements Insertable<Session> {
           other.mode == this.mode &&
           other.starred == this.starred &&
           other.audioPath == this.audioPath &&
-          other.audioBytes == this.audioBytes);
+          other.audioBytes == this.audioBytes &&
+          other.transcribeSeconds == this.transcribeSeconds &&
+          other.textInputTokens == this.textInputTokens &&
+          other.textCachedTokens == this.textCachedTokens &&
+          other.textOutputTokens == this.textOutputTokens &&
+          other.speechSeconds == this.speechSeconds);
 }
 
 class SessionsCompanion extends UpdateCompanion<Session> {
@@ -511,6 +722,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
   final Value<bool> starred;
   final Value<String?> audioPath;
   final Value<int> audioBytes;
+  final Value<double?> transcribeSeconds;
+  final Value<int> textInputTokens;
+  final Value<int> textCachedTokens;
+  final Value<int> textOutputTokens;
+  final Value<double> speechSeconds;
   final Value<int> rowid;
   const SessionsCompanion({
     this.id = const Value.absent(),
@@ -524,6 +740,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.starred = const Value.absent(),
     this.audioPath = const Value.absent(),
     this.audioBytes = const Value.absent(),
+    this.transcribeSeconds = const Value.absent(),
+    this.textInputTokens = const Value.absent(),
+    this.textCachedTokens = const Value.absent(),
+    this.textOutputTokens = const Value.absent(),
+    this.speechSeconds = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SessionsCompanion.insert({
@@ -538,6 +759,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     this.starred = const Value.absent(),
     this.audioPath = const Value.absent(),
     this.audioBytes = const Value.absent(),
+    this.transcribeSeconds = const Value.absent(),
+    this.textInputTokens = const Value.absent(),
+    this.textCachedTokens = const Value.absent(),
+    this.textOutputTokens = const Value.absent(),
+    this.speechSeconds = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        sourceLang = Value(sourceLang),
@@ -556,6 +782,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Expression<bool>? starred,
     Expression<String>? audioPath,
     Expression<int>? audioBytes,
+    Expression<double>? transcribeSeconds,
+    Expression<int>? textInputTokens,
+    Expression<int>? textCachedTokens,
+    Expression<int>? textOutputTokens,
+    Expression<double>? speechSeconds,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -570,6 +801,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       if (starred != null) 'starred': starred,
       if (audioPath != null) 'audio_path': audioPath,
       if (audioBytes != null) 'audio_bytes': audioBytes,
+      if (transcribeSeconds != null) 'transcribe_seconds': transcribeSeconds,
+      if (textInputTokens != null) 'text_input_tokens': textInputTokens,
+      if (textCachedTokens != null) 'text_cached_tokens': textCachedTokens,
+      if (textOutputTokens != null) 'text_output_tokens': textOutputTokens,
+      if (speechSeconds != null) 'speech_seconds': speechSeconds,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -586,6 +822,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     Value<bool>? starred,
     Value<String?>? audioPath,
     Value<int>? audioBytes,
+    Value<double?>? transcribeSeconds,
+    Value<int>? textInputTokens,
+    Value<int>? textCachedTokens,
+    Value<int>? textOutputTokens,
+    Value<double>? speechSeconds,
     Value<int>? rowid,
   }) {
     return SessionsCompanion(
@@ -600,6 +841,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
       starred: starred ?? this.starred,
       audioPath: audioPath ?? this.audioPath,
       audioBytes: audioBytes ?? this.audioBytes,
+      transcribeSeconds: transcribeSeconds ?? this.transcribeSeconds,
+      textInputTokens: textInputTokens ?? this.textInputTokens,
+      textCachedTokens: textCachedTokens ?? this.textCachedTokens,
+      textOutputTokens: textOutputTokens ?? this.textOutputTokens,
+      speechSeconds: speechSeconds ?? this.speechSeconds,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -644,6 +890,21 @@ class SessionsCompanion extends UpdateCompanion<Session> {
     if (audioBytes.present) {
       map['audio_bytes'] = Variable<int>(audioBytes.value);
     }
+    if (transcribeSeconds.present) {
+      map['transcribe_seconds'] = Variable<double>(transcribeSeconds.value);
+    }
+    if (textInputTokens.present) {
+      map['text_input_tokens'] = Variable<int>(textInputTokens.value);
+    }
+    if (textCachedTokens.present) {
+      map['text_cached_tokens'] = Variable<int>(textCachedTokens.value);
+    }
+    if (textOutputTokens.present) {
+      map['text_output_tokens'] = Variable<int>(textOutputTokens.value);
+    }
+    if (speechSeconds.present) {
+      map['speech_seconds'] = Variable<double>(speechSeconds.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -664,6 +925,11 @@ class SessionsCompanion extends UpdateCompanion<Session> {
           ..write('starred: $starred, ')
           ..write('audioPath: $audioPath, ')
           ..write('audioBytes: $audioBytes, ')
+          ..write('transcribeSeconds: $transcribeSeconds, ')
+          ..write('textInputTokens: $textInputTokens, ')
+          ..write('textCachedTokens: $textCachedTokens, ')
+          ..write('textOutputTokens: $textOutputTokens, ')
+          ..write('speechSeconds: $speechSeconds, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1180,6 +1446,11 @@ typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
   Value<bool> starred,
   Value<String?> audioPath,
   Value<int> audioBytes,
+  Value<double?> transcribeSeconds,
+  Value<int> textInputTokens,
+  Value<int> textCachedTokens,
+  Value<int> textOutputTokens,
+  Value<double> speechSeconds,
   Value<int> rowid,
 });
 typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
@@ -1194,6 +1465,11 @@ typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
   Value<bool> starred,
   Value<String?> audioPath,
   Value<int> audioBytes,
+  Value<double?> transcribeSeconds,
+  Value<int> textInputTokens,
+  Value<int> textCachedTokens,
+  Value<int> textOutputTokens,
+  Value<double> speechSeconds,
   Value<int> rowid,
 });
 
@@ -1287,6 +1563,31 @@ class $$SessionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get transcribeSeconds => $composableBuilder(
+    column: $table.transcribeSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get textInputTokens => $composableBuilder(
+    column: $table.textInputTokens,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get textCachedTokens => $composableBuilder(
+    column: $table.textCachedTokens,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get textOutputTokens => $composableBuilder(
+    column: $table.textOutputTokens,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get speechSeconds => $composableBuilder(
+    column: $table.speechSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> linesRefs(
     Expression<bool> Function($$LinesTableFilterComposer f) f,
   ) {
@@ -1376,6 +1677,31 @@ class $$SessionsTableOrderingComposer
     column: $table.audioBytes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get transcribeSeconds => $composableBuilder(
+    column: $table.transcribeSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get textInputTokens => $composableBuilder(
+    column: $table.textInputTokens,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get textCachedTokens => $composableBuilder(
+    column: $table.textCachedTokens,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get textOutputTokens => $composableBuilder(
+    column: $table.textOutputTokens,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get speechSeconds => $composableBuilder(
+    column: $table.speechSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SessionsTableAnnotationComposer
@@ -1425,6 +1751,31 @@ class $$SessionsTableAnnotationComposer
 
   GeneratedColumn<int> get audioBytes => $composableBuilder(
     column: $table.audioBytes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get transcribeSeconds => $composableBuilder(
+    column: $table.transcribeSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get textInputTokens => $composableBuilder(
+    column: $table.textInputTokens,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get textCachedTokens => $composableBuilder(
+    column: $table.textCachedTokens,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get textOutputTokens => $composableBuilder(
+    column: $table.textOutputTokens,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get speechSeconds => $composableBuilder(
+    column: $table.speechSeconds,
     builder: (column) => column,
   );
 
@@ -1493,6 +1844,11 @@ class $$SessionsTableTableManager
                 Value<bool> starred = const Value.absent(),
                 Value<String?> audioPath = const Value.absent(),
                 Value<int> audioBytes = const Value.absent(),
+                Value<double?> transcribeSeconds = const Value.absent(),
+                Value<int> textInputTokens = const Value.absent(),
+                Value<int> textCachedTokens = const Value.absent(),
+                Value<int> textOutputTokens = const Value.absent(),
+                Value<double> speechSeconds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SessionsCompanion(
                 id: id,
@@ -1506,6 +1862,11 @@ class $$SessionsTableTableManager
                 starred: starred,
                 audioPath: audioPath,
                 audioBytes: audioBytes,
+                transcribeSeconds: transcribeSeconds,
+                textInputTokens: textInputTokens,
+                textCachedTokens: textCachedTokens,
+                textOutputTokens: textOutputTokens,
+                speechSeconds: speechSeconds,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1521,6 +1882,11 @@ class $$SessionsTableTableManager
                 Value<bool> starred = const Value.absent(),
                 Value<String?> audioPath = const Value.absent(),
                 Value<int> audioBytes = const Value.absent(),
+                Value<double?> transcribeSeconds = const Value.absent(),
+                Value<int> textInputTokens = const Value.absent(),
+                Value<int> textCachedTokens = const Value.absent(),
+                Value<int> textOutputTokens = const Value.absent(),
+                Value<double> speechSeconds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SessionsCompanion.insert(
                 id: id,
@@ -1534,6 +1900,11 @@ class $$SessionsTableTableManager
                 starred: starred,
                 audioPath: audioPath,
                 audioBytes: audioBytes,
+                transcribeSeconds: transcribeSeconds,
+                textInputTokens: textInputTokens,
+                textCachedTokens: textCachedTokens,
+                textOutputTokens: textOutputTokens,
+                speechSeconds: speechSeconds,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

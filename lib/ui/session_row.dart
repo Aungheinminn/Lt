@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../core/pricing.dart';
 import '../data/db/app_database.dart';
 import 'basics.dart';
 import 'tokens.dart';
@@ -16,7 +17,12 @@ class SessionRow extends StatelessWidget {
     final c = context.lt;
     final s = session;
     final minutes = (s.durationMs / 60000).ceil();
-    final meta = '$minutes min · ${DateFormat.jm().format(s.createdAt)}';
+    final cost = SessionCost.of(s);
+    final meta = [
+      '$minutes min',
+      DateFormat.jm().format(s.createdAt.toLocal()),
+      if (cost != null) formatUsd(cost.total),
+    ].join(' · ');
 
     return InkWell(
       onTap: onTap,

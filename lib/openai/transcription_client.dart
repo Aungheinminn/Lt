@@ -20,9 +20,12 @@ class TranscriptDelta extends TranscriptionEvent {
 }
 
 class TranscriptCompleted extends TranscriptionEvent {
-  TranscriptCompleted(this.itemId, this.transcript);
+  TranscriptCompleted(this.itemId, this.transcript, {this.billedSeconds = 0});
   final String itemId;
   final String transcript;
+
+  /// Audio duration OpenAI billed for this item.
+  final double billedSeconds;
 }
 
 class TranscriptFailed extends TranscriptionEvent {
@@ -159,7 +162,13 @@ class TranscriptionClient {
       case 'conversation.item.input_audio_transcription.delta':
         return _Parsed(TranscriptDelta(item(), m['delta'] as String? ?? ''));
       case 'conversation.item.input_audio_transcription.completed':
-        return _Parsed(TranscriptCompleted(item(), m['transcript'] as String? ?? ''));
+        final usage = m['usage'] as Map<String, dynamic>?;
+        final seconds = usage?['type'] == 'duration' ? (usage?['seconds'] as num?)?.toDouble() : null;
+        return _Parsed(TranscriptCompleted(
+          item(),
+          m['transcript'] as String? ?? '',
+          billedSeconds: seconds ?? 0,
+        ));
       case 'conversation.item.input_audio_transcription.failed':
         final err = m['error'] as Map<String, dynamic>?;
         return _Parsed(TranscriptFailed(item(), err?['message'] as String? ?? 'Transcription failed'));

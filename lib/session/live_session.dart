@@ -92,6 +92,7 @@ class LiveSessionController extends Notifier<LiveState> {
   static const _contextLines = 3;
   static const _resendChunkBytes = 48000;
   static const _reconnectDelays = [1, 2, 4, 8, 15, 30];
+  static const _uiInterval = Duration(milliseconds: 66);
 
   AppDatabase get _db => ref.read(databaseProvider);
 
@@ -115,6 +116,7 @@ class LiveSessionController extends Notifier<LiveState> {
   int _bytes = 0;
   int _segCounter = 0;
   String? _currentSeg;
+  DateTime _lastUiUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Bumped on teardown so a reconnect loop from an old session gives up.
   int _generation = 0;
@@ -173,11 +175,19 @@ class LiveSessionController extends Notifier<LiveState> {
       if (captions) {
         _attach(await TranscriptionClient.connect(apiKey: key, language: _sourceCode));
       }
-      _text = OpenAiTextClient(key);
-      _translator = Translator(_text!);
-      if (captions && settings.speakTranslation) _speaker = TranslationSpeaker(_text!);
-
       final id = _sessionId = const Uuid().v4();
+      final db = _db;
+      _text = OpenAiTextClient(
+        key,
+        onUsage: (u) => db.addUsage(id, textInput: u.input, textCached: u.cached, textOutput: u.output),
+      );
+      _translator = Translator(_text!);
+      if (captions && settings.speakTranslation) {
+        _speaker = TranslationSpeaker(
+          _text!,
+          onSpoken: (d) => db.addUsage(id, speechSeconds: d.inMilliseconds / 1000),
+        );
+      }
       _sink = settings.saveAudio ? await openAudioFileSink(id) : null;
       await _db.createSession(
         id: id,
@@ -315,6 +325,11 @@ class LiveSessionController extends Notifier<LiveState> {
     for (final e in vad.process(heard)) {
       _handleVad(e);
     }
+    // The mic delivers chunks far faster than the eye needs; redrawing the
+    // Live screen for each one costs battery for no visible gain.
+    final now = DateTime.now();
+    if (vad.inSpeech == state.speaking && now.difference(_lastUiUpdate) < _uiInterval) return;
+    _lastUiUpdate = now;
     state = state.copyWith(
       elapsedMs: _bytes ~/ WavWriter.bytesPerMs,
       level: vad.level,
@@ -398,7 +413,8 @@ class LiveSessionController extends Notifier<LiveState> {
         final partials = {...state.partials};
         partials[seg] = (partials[seg] ?? '') + delta;
         state = state.copyWith(partials: partials);
-      case TranscriptCompleted(:final itemId, :final transcript):
+      case TranscriptCompleted(:final itemId, :final transcript, :final billedSeconds):
+        if (billedSeconds > 0) _db.addUsage(id, transcribeSeconds: billedSeconds);
         final seg = _segFor(itemId);
         if (seg == null) return;
         _itemToSeg.remove(itemId);

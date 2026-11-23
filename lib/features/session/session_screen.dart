@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../audio/audio_file_sink.dart';
 import '../../audio/line_sync.dart';
+import '../../core/pricing.dart';
 import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
 import '../../session/session_storage.dart';
@@ -17,6 +18,7 @@ import '../../ui/basics.dart';
 import '../../ui/player_dock.dart';
 import '../../ui/tokens.dart';
 import '../../ui/transcript_line.dart';
+import 'cost_sheet.dart';
 
 class SessionScreen extends ConsumerStatefulWidget {
   const SessionScreen({super.key, required this.sessionId});
@@ -381,6 +383,12 @@ class _Header extends StatelessWidget {
               ),
               LtChip(label: date),
               LtChip(label: '$minutes min'),
+              if (SessionCost.of(s) case final cost?)
+                LtChip(
+                  label: '≈ ${formatUsd(cost.total)}',
+                  icon: Icons.payments_outlined,
+                  onTap: () => showCostBreakdown(context, cost),
+                ),
               if (s.mode == SessionMode.interpreter)
                 const LtChip(label: 'Interpreter', icon: Icons.record_voice_over_rounded),
             ],
