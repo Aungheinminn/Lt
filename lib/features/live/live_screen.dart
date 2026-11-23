@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/languages.dart';
 import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
+import '../../data/settings/app_settings.dart';
 import '../../session/live_session.dart';
 import '../../widgets/language_picker.dart';
 
@@ -20,7 +21,10 @@ class LiveScreen extends ConsumerWidget {
       final saved = next.savedSessionId;
       if (saved != null && saved != prev?.savedSessionId) {
         messenger.showSnackBar(SnackBar(
-          content: Text(next.error ?? 'Session saved to History'),
+          content: Text(next.error ??
+              (next.savedWithAudio ? 'Audio saved to History' : 'Transcript saved to History')),
+          duration: const Duration(seconds: 4),
+          persist: false,
           action: SnackBarAction(
             label: 'Open',
             onPressed: () => context.go('/history/$saved'),
@@ -97,31 +101,33 @@ class _IdleView extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            SegmentedButton<SessionMode>(
-              segments: const [
-                ButtonSegment(
-                  value: SessionMode.captions,
-                  icon: Icon(Icons.subtitles_outlined),
-                  label: Text('Captions'),
-                ),
-                ButtonSegment(
-                  value: SessionMode.interpreter,
-                  icon: Icon(Icons.record_voice_over_outlined),
-                  label: Text('Interpreter'),
-                ),
-              ],
-              selected: {settings.mode},
-              onSelectionChanged: connecting ? null : (s) => controller.setMode(s.first),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              settings.mode == SessionMode.captions
-                  ? 'Sentence-by-sentence text with exact timing. Translations can be read aloud.'
-                  : 'Hear the translation as you speak, with the lowest delay. Text is approximate.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
+            if (interpreterModeEnabled) ...[
+              const SizedBox(height: 20),
+              SegmentedButton<SessionMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: SessionMode.captions,
+                    icon: Icon(Icons.subtitles_outlined),
+                    label: Text('Captions'),
+                  ),
+                  ButtonSegment(
+                    value: SessionMode.interpreter,
+                    icon: Icon(Icons.record_voice_over_outlined),
+                    label: Text('Interpreter'),
+                  ),
+                ],
+                selected: {settings.mode},
+                onSelectionChanged: connecting ? null : (s) => controller.setMode(s.first),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                settings.mode == SessionMode.captions
+                    ? 'Sentence-by-sentence text with exact timing. Translations can be read aloud.'
+                    : 'Hear the translation as you speak, with the lowest delay. Text is approximate.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: 32),
             Center(
               child: SizedBox.square(

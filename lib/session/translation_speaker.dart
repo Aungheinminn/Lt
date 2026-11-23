@@ -14,7 +14,9 @@ class TranslationSpeaker {
   TranslationSpeaker(this._client);
 
   final OpenAiTextClient _client;
-  final _player = AudioPlayer();
+  // Without session activation the player doesn't take audio focus, so
+  // whatever else is playing (the speaker the user may be translating) goes on.
+  final _player = AudioPlayer(handleAudioSessionActivation: false, handleInterruptions: false);
   final _queue = Queue<Future<Uint8List?>>();
   bool _running = false;
   bool _disposed = false;

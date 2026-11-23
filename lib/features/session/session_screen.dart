@@ -37,15 +37,26 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   int _current = -1;
   List<int> _starts = const [];
   List<Line> _lines = const [];
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
     _positionSub = _player.positionStream.listen(_onPosition);
+    _lifecycle = AppLifecycleListener(onPause: _player.pause);
+  }
+
+  // The shell keeps inactive tabs mounted under a disabled TickerMode, so this
+  // is how the screen learns it was switched away from.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!TickerMode.valuesOf(context).enabled && _player.playing) _player.pause();
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _positionSub?.cancel();
     _player.dispose();
     _scroll.dispose();

@@ -2,6 +2,10 @@ import 'package:material_ui/material_ui.dart';
 
 import '../db/tables.dart';
 
+/// Interpreter mode is switched off until it's ready again; a stored
+/// `interpreter` setting is read as captions while this is false.
+const interpreterModeEnabled = false;
+
 @immutable
 class AppSettings {
   const AppSettings({

@@ -60,7 +60,9 @@ class SettingsController extends Notifier<AppSettings> {
       saveAudio: _prefs.getBool(_saveAudio) ?? d.saveAudio,
       speakTranslation: _prefs.getBool(_speak) ?? d.speakTranslation,
       audioRetentionDays: _prefs.getInt(_retention) ?? d.audioRetentionDays,
-      mode: SessionMode.values.asNameMap()[_prefs.getString(_mode)] ?? d.mode,
+      mode: interpreterModeEnabled
+          ? SessionMode.values.asNameMap()[_prefs.getString(_mode)] ?? d.mode
+          : SessionMode.captions,
     );
   }
 

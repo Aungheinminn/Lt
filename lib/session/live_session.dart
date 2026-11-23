@@ -36,6 +36,7 @@ class LiveState {
     this.partials = const {},
     this.error,
     this.savedSessionId,
+    this.savedWithAudio = false,
   });
 
   final LivePhase phase;
@@ -54,6 +55,7 @@ class LiveState {
 
   /// Set after Stop when a session was saved, so the UI can offer to open it.
   final String? savedSessionId;
+  final bool savedWithAudio;
 
   bool get active => phase != LivePhase.idle;
 
@@ -77,6 +79,7 @@ class LiveState {
       partials: partials ?? this.partials,
       error: clearError ? null : error ?? this.error,
       savedSessionId: savedSessionId,
+      savedWithAudio: savedWithAudio,
     );
   }
 }
@@ -200,12 +203,24 @@ class LiveSessionController extends Notifier<LiveState> {
       _bytes = 0;
       _segCounter = 0;
 
-      final mic = await recorder.startStream(const RecordConfig(
+      // Other apps must keep playing at full volume: the default interruption
+      // mode takes Android audio focus (pausing YouTube etc.), and echoCancel
+      // on macOS/iOS switches to the voice-processing unit, which ducks all
+      // other audio while recording.
+      final mic = await recorder.startStream(RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: WavWriter.sampleRate,
         numChannels: 1,
-        echoCancel: true,
+        echoCancel: defaultTargetPlatform != TargetPlatform.macOS &&
+            defaultTargetPlatform != TargetPlatform.iOS,
         noiseSuppress: true,
+        audioInterruption: AudioInterruptionMode.none,
+        iosConfig: const IosRecordConfig(categoryOptions: [
+          IosAudioCategoryOption.mixWithOthers,
+          IosAudioCategoryOption.defaultToSpeaker,
+          IosAudioCategoryOption.allowBluetooth,
+          IosAudioCategoryOption.allowBluetoothA2DP,
+        ]),
       ));
       _micSub = mic.listen(
         _onAudio,
@@ -278,7 +293,7 @@ class LiveSessionController extends Notifier<LiveState> {
     final note = untranscribed > 0
         ? '$untranscribed ${untranscribed == 1 ? 'sentence was' : 'sentences were'} not transcribed because the connection was lost.'
         : null;
-    state = LiveState(savedSessionId: id, error: reason ?? note);
+    state = LiveState(savedSessionId: id, savedWithAudio: sink != null, error: reason ?? note);
     unawaited(_nameSession(id, lines, translator));
   }
 
