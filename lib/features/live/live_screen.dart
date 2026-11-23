@@ -2,12 +2,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../core/languages.dart';
 import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
 import '../../data/settings/app_settings.dart';
 import '../../session/live_session.dart';
-import '../../widgets/language_picker.dart';
+import '../../ui/basics.dart';
+import '../../ui/language_card.dart';
+import '../../ui/mic_button.dart';
+import '../../ui/record_dock.dart';
+import '../../ui/tokens.dart';
+import '../../ui/transcript_line.dart';
 
 class LiveScreen extends ConsumerWidget {
   const LiveScreen({super.key});
@@ -38,7 +42,6 @@ class LiveScreen extends ConsumerWidget {
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Live')),
       body: SafeArea(
         child: live.active && live.sessionId != null
             ? _LiveView(state: live)
@@ -58,108 +61,98 @@ class _IdleView extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final controller = ref.read(settingsProvider.notifier);
     final hasKey = ref.watch(apiKeyProvider).value?.isNotEmpty ?? false;
-    final theme = Theme.of(context);
+    final c = context.lt;
+    final wide = context.isWide;
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (!hasKey)
-              Card(
-                color: theme.colorScheme.errorContainer,
-                child: ListTile(
-                  leading: const Icon(Icons.key),
-                  title: const Text('Add your OpenAI API key'),
-                  subtitle: const Text('Lt needs it to transcribe and translate.'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.go('/settings'),
-                ),
-              ),
-            const SizedBox(height: 8),
-            Row(
+    final micState = !hasKey
+        ? MicState.disabled
+        : connecting
+            ? MicState.connecting
+            : MicState.ready;
+
+    return ReadingColumn(
+      maxWidth: 560,
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(16, wide ? 24 : 8, 16, 0),
+            sliver: SliverList.list(
               children: [
-                Expanded(
-                  child: LanguagePicker(
-                    label: 'I speak',
-                    value: settings.sourceLang,
-                    onChanged: (v) => controller.setLanguages(source: v),
-                  ),
+                Row(
+                  children: [
+                    Expanded(child: Text('Live', style: LtText.title.copyWith(color: c.ink))),
+                    LtChip(
+                      icon: settings.saveAudio ? Icons.save_rounded : Icons.save_outlined,
+                      label: settings.saveAudio ? 'Audio on' : 'Audio off',
+                      tone: settings.saveAudio ? ChipTone.neutral : ChipTone.warn,
+                      onTap: () => controller.setSaveAudio(!settings.saveAudio),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Swap languages',
-                  icon: const Icon(Icons.swap_horiz),
-                  onPressed: controller.swapLanguages,
-                ),
-                Expanded(
-                  child: LanguagePicker(
-                    label: 'Translate to',
-                    value: settings.targetLang,
-                    onChanged: (v) => controller.setLanguages(target: v),
+                const SizedBox(height: 14),
+                if (!hasKey) ...[
+                  LtBanner(
+                    icon: Icons.key_rounded,
+                    title: 'Connect OpenAI to start',
+                    body: 'Your key stays on this device.',
+                    actionLabel: 'Add key',
+                    onAction: () => context.go('/settings'),
                   ),
+                  const SizedBox(height: 12),
+                ],
+                LanguageCard(
+                  source: settings.sourceLang,
+                  target: settings.targetLang,
+                  onSource: (v) => controller.setLanguages(source: v),
+                  onTarget: (v) => controller.setLanguages(target: v),
+                  onSwap: controller.swapLanguages,
                 ),
-              ],
-            ),
-            if (interpreterModeEnabled) ...[
-              const SizedBox(height: 20),
-              SegmentedButton<SessionMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: SessionMode.captions,
-                    icon: Icon(Icons.subtitles_outlined),
-                    label: Text('Captions'),
-                  ),
-                  ButtonSegment(
-                    value: SessionMode.interpreter,
-                    icon: Icon(Icons.record_voice_over_outlined),
-                    label: Text('Interpreter'),
+                if (interpreterModeEnabled) ...[
+                  const SizedBox(height: 12),
+                  LtSegmented<SessionMode>(
+                    segments: const [
+                      (SessionMode.captions, 'Captions', Icons.subtitles_rounded),
+                      (SessionMode.interpreter, 'Interpreter', Icons.record_voice_over_rounded),
+                    ],
+                    selected: settings.mode,
+                    onChanged: connecting ? null : controller.setMode,
                   ),
                 ],
-                selected: {settings.mode},
-                onSelectionChanged: connecting ? null : (s) => controller.setMode(s.first),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                settings.mode == SessionMode.captions
-                    ? 'Sentence-by-sentence text with exact timing. Translations can be read aloud.'
-                    : 'Hear the translation as you speak, with the lowest delay. Text is approximate.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-            const SizedBox(height: 32),
-            Center(
-              child: SizedBox.square(
-                dimension: 120,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(shape: const CircleBorder()),
-                  onPressed: hasKey && !connecting
-                      ? () => ref.read(liveSessionProvider.notifier).start()
-                      : null,
-                  child: connecting
-                      ? const SizedBox.square(
-                          dimension: 36,
-                          child: CircularProgressIndicator(strokeWidth: 3),
-                        )
-                      : const Icon(Icons.mic, size: 48),
-                ),
+              ],
+            ),
+          ),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  MicButton(
+                    state: micState,
+                    onPressed: () => ref.read(liveSessionProvider.notifier).start(),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    switch (micState) {
+                      MicState.disabled => 'Add a key to start',
+                      MicState.connecting => 'Connecting…',
+                      MicState.ready => wide ? 'Click to start' : 'Tap to start',
+                    },
+                    style: LtText.rowTitle.copyWith(fontSize: 17, color: c.ink),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    settings.mode == SessionMode.captions
+                        ? 'Captions · sentence by sentence'
+                        : 'Interpreter · lowest delay, approximate text',
+                    style: LtText.original.copyWith(color: c.muted),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              connecting ? 'Connecting…' : 'Tap to start',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              settings.saveAudio ? 'Audio will be saved' : 'Audio will not be saved',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -203,163 +196,89 @@ class _LiveViewState extends ConsumerState<_LiveView> {
     final s = widget.state;
     final settings = ref.watch(settingsProvider);
     final lines = ref.watch(linesProvider(s.sessionId!)).value ?? const <Line>[];
-    final theme = Theme.of(context);
     final stopping = s.phase == LivePhase.stopping;
     _followBottom(lines.length + s.partials.length);
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Row(
-            children: [
-              _StatusDot(speaking: s.speaking, stopping: stopping),
-              const SizedBox(width: 8),
-              Text(
-                stopping ? 'Finishing…' : (s.speaking ? 'Hearing speech' : 'Listening'),
-                style: theme.textTheme.titleSmall,
-              ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  '${settings.mode == SessionMode.interpreter ? 'Interpreter · ' : ''}'
-                  '${languageFor(settings.sourceLang).name} → ${languageFor(settings.targetLang).name}',
-                  style: theme.textTheme.bodySmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                _clock(s.elapsedMs),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        ),
-        LinearProgressIndicator(value: stopping ? null : s.level, minHeight: 3),
-        if (s.reconnecting)
-          Container(
-            width: double.infinity,
-            color: theme.colorScheme.tertiaryContainer,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    final status = stopping
+        ? const LtChip(label: 'Finishing…')
+        : s.speaking
+            ? const LtChip(label: 'Hearing speech', tone: ChipTone.rec, pulse: true)
+            : const LtChip(label: 'Listening', tone: ChipTone.brand, pulse: true);
+
+    return ReadingColumn(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
             child: Row(
               children: [
-                const SizedBox.square(
-                  dimension: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Connection lost. Still recording; sentences will be translated when it reconnects.',
-                    style: TextStyle(color: theme.colorScheme.onTertiaryContainer),
-                  ),
+                status,
+                const Spacer(),
+                if (settings.mode == SessionMode.interpreter) ...[
+                  const LtChip(label: 'Interpreter', icon: Icons.record_voice_over_rounded),
+                  const SizedBox(width: 6),
+                ],
+                LtChip(
+                  label: '${settings.sourceLang.toUpperCase()} → ${settings.targetLang.toUpperCase()}',
                 ),
               ],
             ),
           ),
-        Expanded(
-          child: lines.isEmpty
-              ? Center(
-                  child: Text(
-                    'Start speaking. Each sentence appears here with its translation.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
-                  ),
-                )
-              : ListView.separated(
-                  controller: _scroll,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: lines.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 14),
-                  itemBuilder: (context, i) {
-                    final l = lines[i];
-                    return _LiveLine(line: l, partial: s.partials[l.itemId]);
-                  },
-                ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: theme.colorScheme.error,
-                foregroundColor: theme.colorScheme.onError,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+          if (s.reconnecting)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: InlineNote(
+                icon: Icons.wifi_off_rounded,
+                busy: true,
+                text: 'Reconnecting. Still recording, translations will catch up.',
               ),
-              onPressed: stopping ? null : () => ref.read(liveSessionProvider.notifier).stop(),
-              icon: const Icon(Icons.stop),
-              label: Text(stopping ? 'Saving…' : 'Stop'),
             ),
+          Expanded(
+            child: lines.isEmpty
+                ? EmptyState(
+                    icon: Icons.graphic_eq_rounded,
+                    title: 'Start speaking',
+                    body: 'Each sentence appears here with its translation.',
+                  )
+                : ShaderMask(
+                    shaderCallback: (r) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Colors.black],
+                      stops: [0, 0.06],
+                    ).createShader(r),
+                    blendMode: BlendMode.dstIn,
+                    child: ListView.separated(
+                      controller: _scroll,
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      itemCount: lines.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, i) {
+                        final l = lines[i];
+                        return LiveLine(
+                          original: l.originalText,
+                          translation: l.translatedText,
+                          partial: s.partials[l.itemId],
+                          ended: l.endMs != null,
+                        );
+                      },
+                    ),
+                  ),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LiveLine extends StatelessWidget {
-  const _LiveLine({required this.line, this.partial});
-
-  final Line line;
-  final String? partial;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final original = line.originalText ?? partial;
-    final muted = theme.colorScheme.outline;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          original ?? (line.endMs == null ? 'Listening…' : 'Transcribing…'),
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: line.originalText == null ? muted : null,
-          ),
-        ),
-        if (line.originalText != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            line.translatedText ?? 'Translating…',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: line.translatedText == null ? muted : theme.colorScheme.primary,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: RecordDock(
+                elapsedMs: s.elapsedMs,
+                level: s.level,
+                stopping: stopping,
+                onStop: () => ref.read(liveSessionProvider.notifier).stop(),
+              ),
             ),
           ),
         ],
-      ],
-    );
-  }
-}
-
-class _StatusDot extends StatelessWidget {
-  const _StatusDot({required this.speaking, required this.stopping});
-
-  final bool speaking;
-  final bool stopping;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      width: 12,
-      height: 12,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: stopping ? scheme.outline : (speaking ? scheme.error : scheme.primary),
       ),
     );
   }
-}
-
-String _clock(int ms) {
-  final s = ms ~/ 1000;
-  final h = s ~/ 3600;
-  final m = (s % 3600) ~/ 60;
-  final sec = (s % 60).toString().padLeft(2, '0');
-  return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:$sec' : '$m:$sec';
 }

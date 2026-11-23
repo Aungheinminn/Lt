@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -12,7 +13,10 @@ import '../../audio/line_sync.dart';
 import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
 import '../../session/session_storage.dart';
-import 'player_bar.dart';
+import '../../ui/basics.dart';
+import '../../ui/player_dock.dart';
+import '../../ui/tokens.dart';
+import '../../ui/transcript_line.dart';
 
 class SessionScreen extends ConsumerStatefulWidget {
   const SessionScreen({super.key, required this.sessionId});
@@ -163,7 +167,11 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
         content: Text(body),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(action)),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: context.lt.rec, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(action),
+          ),
         ],
       ),
     );
@@ -174,6 +182,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
     final session = ref.watch(sessionProvider(widget.sessionId)).value;
     final linesAsync = ref.watch(linesProvider(widget.sessionId));
     final db = ref.read(databaseProvider);
+    final c = context.lt;
 
     if (session != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadAudio(session.audioPath));
@@ -191,57 +200,91 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
         focusNode: _focus,
         autofocus: true,
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(session?.title ?? ''),
-            actions: [
-              if (session != null)
-                IconButton(
-                  tooltip: session.starred ? 'Unstar' : 'Star',
-                  icon: Icon(session.starred ? Icons.star : Icons.star_border),
-                  onPressed: () => db.updateSession(
-                    session.id,
-                    SessionsCompanion(starred: Value(!session.starred)),
+          body: SafeArea(
+            child: ReadingColumn(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 8, 0),
+                    child: Row(
+                      children: [
+                        RoundIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          tooltip: 'Back to History',
+                          filled: true,
+                          onPressed: () => context.go('/history'),
+                        ),
+                        const Spacer(),
+                        if (session != null) ...[
+                          RoundIconButton(
+                            icon: session.starred ? Icons.star_rounded : Icons.star_outline_rounded,
+                            tooltip: session.starred ? 'Unstar' : 'Star',
+                            color: session.starred ? c.star : null,
+                            onPressed: () => db.updateSession(
+                              session.id,
+                              SessionsCompanion(starred: Value(!session.starred)),
+                            ),
+                          ),
+                          PopupMenuButton<String>(
+                            tooltip: 'More',
+                            icon: const Icon(Icons.more_horiz_rounded),
+                            onSelected: (v) {
+                              if (v == 'delete') _confirmDelete(session);
+                              if (v == 'delete_audio') _confirmDeleteAudio(session);
+                            },
+                            itemBuilder: (_) => [
+                              if (session.audioPath != null)
+                                const PopupMenuItem(value: 'delete_audio', child: Text('Delete audio only')),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Delete session', style: TextStyle(color: c.rec)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              if (session != null)
-                PopupMenuButton<String>(
-                  tooltip: 'More',
-                  onSelected: (v) {
-                    if (v == 'delete') _confirmDelete(session);
-                    if (v == 'delete_audio') _confirmDeleteAudio(session);
-                  },
-                  itemBuilder: (_) => [
-                    if (session.audioPath != null)
-                      const PopupMenuItem(value: 'delete_audio', child: Text('Delete audio only')),
-                    const PopupMenuItem(value: 'delete', child: Text('Delete session')),
-                  ],
-                ),
-            ],
-          ),
-          body: linesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Could not load transcript: $e')),
-            data: (lines) => Column(
-              children: [
-                if (session?.status == SessionStatus.interrupted)
-                  const _Notice(
-                    icon: Icons.warning_amber,
-                    text: 'This session was interrupted. Everything up to that point was saved.',
+                  if (session != null) _Header(session: session),
+                  if (session?.status == SessionStatus.interrupted)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: InlineNote(
+                        icon: Icons.info_outline_rounded,
+                        text: 'Interrupted. Everything up to that point was saved.',
+                      ),
+                    ),
+                  if (_audioMissing)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: InlineNote(
+                        icon: Icons.music_off_rounded,
+                        text: 'The audio file for this session could not be opened.',
+                      ),
+                    ),
+                  Expanded(
+                    child: linesAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => EmptyState(
+                        icon: Icons.error_outline_rounded,
+                        title: 'Could not load transcript',
+                        body: '$e',
+                      ),
+                      data: _transcript,
+                    ),
                   ),
-                if (_audioMissing)
-                  const _Notice(
-                    icon: Icons.music_off,
-                    text: 'The audio file for this session could not be opened.',
-                  ),
-                Expanded(child: _transcript(lines)),
-                if (_audioReady)
-                  PlayerBar(
-                    player: _player,
-                    lineStartsMs: _starts,
-                    onSkip: _skip,
-                    onTogglePlay: _togglePlay,
-                  ),
-              ],
+                  if (_audioReady)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                      child: PlayerDock(
+                        player: _player,
+                        spans: [for (final l in _lines) (l.startMs, l.endMs)],
+                        onSkip: _skip,
+                        onTogglePlay: _togglePlay,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -250,7 +293,13 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   }
 
   Widget _transcript(List<Line> lines) {
-    if (lines.isEmpty) return const Center(child: Text('No lines in this session.'));
+    if (lines.isEmpty) {
+      return const EmptyState(
+        icon: Icons.notes_rounded,
+        title: 'No lines',
+        body: 'Nothing was transcribed in this session.',
+      );
+    }
     return Stack(
       children: [
         NotificationListener<UserScrollNotification>(
@@ -260,16 +309,20 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
           },
           child: SingleChildScrollView(
             controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 72),
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 64),
             child: Column(
               children: [
                 for (var i = 0; i < lines.length; i++)
-                  _LineTile(
+                  Padding(
                     key: _lineKeys.putIfAbsent(lines[i].itemId, GlobalKey.new),
-                    line: lines[i],
-                    active: i == _current && _audioReady,
-                    canPlay: _audioReady,
-                    onTap: () => _playLine(lines[i]),
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: PlaybackLine(
+                      startMs: lines[i].startMs,
+                      original: lines[i].originalText,
+                      translation: lines[i].translatedText,
+                      active: i == _current && _audioReady,
+                      onTap: _audioReady ? () => _playLine(lines[i]) : null,
+                    ),
                   ),
               ],
             ),
@@ -277,13 +330,18 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
         ),
         if (!_follow && _audioReady)
           Positioned(
-            bottom: 12,
+            bottom: 10,
             left: 0,
             right: 0,
             child: Center(
-              child: FilledButton.tonalIcon(
+              child: FilledButton.icon(
                 onPressed: _backToCurrent,
-                icon: const Icon(Icons.my_location, size: 18),
+                style: FilledButton.styleFrom(
+                  shape: const StadiumBorder(),
+                  minimumSize: const Size(0, 36),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.my_location_rounded, size: 17),
                 label: const Text('Back to current'),
               ),
             ),
@@ -293,103 +351,40 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   }
 }
 
-class _LineTile extends StatelessWidget {
-  const _LineTile({
-    super.key,
-    required this.line,
-    required this.active,
-    required this.canPlay,
-    required this.onTap,
-  });
+class _Header extends StatelessWidget {
+  const _Header({required this.session});
 
-  final Line line;
-  final bool active;
-  final bool canPlay;
-  final VoidCallback onTap;
+  final Session session;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      color: active ? scheme.primaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: canPlay ? onTap : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final c = context.lt;
+    final s = session;
+    final minutes = (s.durationMs / 60000).ceil();
+    final created = s.createdAt.toLocal();
+    final now = DateTime.now();
+    final date = (created.year == now.year ? DateFormat.MMMd() : DateFormat.yMMMd()).add_jm().format(created);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.title, style: LtText.heading.copyWith(color: c.ink)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
-              SizedBox(
-                width: 56,
-                child: Row(
-                  children: [
-                    if (canPlay)
-                      Icon(
-                        active ? Icons.graphic_eq : Icons.play_arrow,
-                        size: 16,
-                        color: active ? scheme.primary : scheme.outline,
-                      ),
-                    const SizedBox(width: 2),
-                    Text(
-                      formatClock(line.startMs),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: active ? scheme.primary : scheme.outline,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
+              LtChip(
+                label: '${s.sourceLang.toUpperCase()} → ${s.targetLang.toUpperCase()}',
+                tone: ChipTone.brand,
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      line.originalText ?? 'Not transcribed',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: line.originalText == null ? scheme.outline : null,
-                        fontStyle: line.originalText == null ? FontStyle.italic : null,
-                      ),
-                    ),
-                    if (line.translatedText != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        line.translatedText!,
-                        style: theme.textTheme.bodyLarge?.copyWith(color: scheme.primary),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+              LtChip(label: date),
+              LtChip(label: '$minutes min'),
+              if (s.mode == SessionMode.interpreter)
+                const LtChip(label: 'Interpreter', icon: Icons.record_voice_over_rounded),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Notice extends StatelessWidget {
-  const _Notice({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      color: scheme.surfaceContainerHigh,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 10),
-          Expanded(child: Text(text)),
         ],
       ),
     );
