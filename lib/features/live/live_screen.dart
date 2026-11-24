@@ -259,6 +259,8 @@ class _LiveViewState extends ConsumerState<_LiveView> {
                           original: l.originalText,
                           translation: l.translatedText,
                           partial: s.partials[l.itemId],
+                          translationSoFar: s.translating[l.itemId],
+                          translationFailed: s.untranslated.contains(l.itemId),
                           ended: l.endMs != null,
                         );
                       },

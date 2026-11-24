@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -38,31 +39,83 @@ class OpenAiTextClient {
   final String _apiKey;
   final http.Client _http;
 
-  Future<String> respond({required String instructions, required String input}) async {
-    final res = await _http.post(
-      _uri,
-      headers: {
+  /// The API default is "medium", which makes the model think before every
+  /// line and adds seconds of delay for no gain on short translations.
+  static String _effort = 'none';
+
+  Future<String> respond({
+    required String instructions,
+    required String input,
+    void Function(String textSoFar)? onDelta,
+  }) async {
+    try {
+      return await _respond(instructions, input, onDelta);
+    } on OpenAiException catch (e) {
+      if (_effort == 'low' || !_isEffortRejected(e)) rethrow;
+      _effort = 'low';
+      return _respond(instructions, input, onDelta);
+    }
+  }
+
+  static bool _isEffortRejected(OpenAiException e) {
+    final m = e.message.toLowerCase();
+    return m.contains('reasoning') || m.contains('effort');
+  }
+
+  Future<String> _respond(
+    String instructions,
+    String input,
+    void Function(String textSoFar)? onDelta,
+  ) async {
+    final req = http.Request('POST', _uri)
+      ..headers.addAll({
         'Authorization': 'Bearer $_apiKey',
         'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
+      })
+      ..body = jsonEncode({
         'model': model,
         'instructions': instructions,
         'input': input,
+        'reasoning': {'effort': _effort},
         'store': false,
-      }),
-    );
-    final body = _decode(res.bodyBytes);
+        'stream': true,
+      });
+    final res = await _http.send(req);
     if (res.statusCode != 200) {
-      final err = body?['error'] as Map<String, dynamic>?;
+      final err = _decode(await res.stream.toBytes())?['error'] as Map<String, dynamic>?;
       throw OpenAiException(
         err?['message'] as String? ?? 'OpenAI request failed (${res.statusCode})',
         code: err?['code'] as String?,
       );
     }
-    final usage = TextUsage.fromResponse(body);
+
+    final text = StringBuffer();
+    Map<String, dynamic>? completed;
+    await for (final data in sseData(res.stream)) {
+      final Map<String, dynamic> event;
+      try {
+        event = jsonDecode(data) as Map<String, dynamic>;
+      } catch (_) {
+        continue;
+      }
+      switch (event['type']) {
+        case 'response.output_text.delta':
+          text.write(event['delta'] as String? ?? '');
+          onDelta?.call(text.toString());
+        case 'response.completed':
+          completed = event['response'] as Map<String, dynamic>?;
+        case 'response.failed' || 'response.incomplete' || 'error':
+          final err = (event['response'] as Map<String, dynamic>?)?['error'] ?? event['error'] ?? event;
+          throw OpenAiException(
+            err is Map ? err['message'] as String? ?? 'OpenAI request failed' : 'OpenAI request failed',
+            code: err is Map ? err['code'] as String? : null,
+          );
+      }
+    }
+    final usage = TextUsage.fromResponse(completed);
     if (usage != null) onUsage?.call(usage);
-    return extractOutputText(body ?? const {}).trim();
+    final out = text.isNotEmpty ? text.toString() : extractOutputText(completed ?? const {});
+    return out.trim();
   }
 
   static const speechModel = 'gpt-4o-mini-tts';
@@ -104,6 +157,21 @@ class OpenAiTextClient {
   }
 }
 
+/// The `data:` payloads of a server-sent event stream.
+Stream<String> sseData(Stream<List<int>> bytes) async* {
+  final data = StringBuffer();
+  await for (final line in const LineSplitter().bind(utf8.decoder.bind(bytes))) {
+    if (line.isEmpty) {
+      if (data.isNotEmpty) yield data.toString();
+      data.clear();
+    } else if (line.startsWith('data:')) {
+      if (data.isNotEmpty) data.write('\n');
+      data.write(line.substring(5).trimLeft());
+    }
+  }
+  if (data.isNotEmpty) yield data.toString();
+}
+
 /// The REST response has no `output_text` convenience field (that's an SDK
 /// helper), so collect text parts from the output messages.
 String extractOutputText(Map<String, dynamic> response) {
@@ -131,6 +199,7 @@ class Translator {
     required String from,
     required String to,
     List<(String, String)> context = const [],
+    void Function(String textSoFar)? onDelta,
   }) {
     final input = StringBuffer();
     if (context.isNotEmpty) {
@@ -149,6 +218,7 @@ class Translator {
           'Keep names, numbers and the speaker\'s tone. '
           'If the line is already in $to, return it unchanged.',
       input: input.toString(),
+      onDelta: onDelta,
     );
   }
 

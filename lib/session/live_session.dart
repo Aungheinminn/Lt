@@ -34,6 +34,8 @@ class LiveState {
     this.speaking = false,
     this.reconnecting = false,
     this.partials = const {},
+    this.translating = const {},
+    this.untranslated = const {},
     this.error,
     this.savedSessionId,
     this.savedWithAudio = false,
@@ -51,6 +53,12 @@ class LiveState {
 
   /// In-progress transcript text by segment key, before the final arrives.
   final Map<String, String> partials;
+
+  /// Translation text streamed so far by segment key, before it's saved.
+  final Map<String, String> translating;
+
+  /// Segments whose translation failed after retries.
+  final Set<String> untranslated;
   final String? error;
 
   /// Set after Stop when a session was saved, so the UI can offer to open it.
@@ -65,6 +73,8 @@ class LiveState {
     bool? speaking,
     bool? reconnecting,
     Map<String, String>? partials,
+    Map<String, String>? translating,
+    Set<String>? untranslated,
     String? error,
     bool clearError = false,
     LivePhase? phase,
@@ -77,6 +87,8 @@ class LiveState {
       speaking: speaking ?? this.speaking,
       reconnecting: reconnecting ?? this.reconnecting,
       partials: partials ?? this.partials,
+      translating: translating ?? this.translating,
+      untranslated: untranslated ?? this.untranslated,
       error: clearError ? null : error ?? this.error,
       savedSessionId: savedSessionId,
       savedWithAudio: savedWithAudio,
@@ -216,13 +228,14 @@ class LiveSessionController extends Notifier<LiveState> {
       // Other apps must keep playing at full volume: the default interruption
       // mode takes Android audio focus (pausing YouTube etc.), and echoCancel
       // on macOS/iOS switches to the voice-processing unit, which ducks all
-      // other audio while recording.
+      // other audio while recording. Echo cancellation also subtracts
+      // whatever this device is playing, which is often the very speech
+      // being translated; spoken translations are kept out by suppressMic.
       final mic = await recorder.startStream(RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: WavWriter.sampleRate,
         numChannels: 1,
-        echoCancel: defaultTargetPlatform != TargetPlatform.macOS &&
-            defaultTargetPlatform != TargetPlatform.iOS,
+        echoCancel: false,
         noiseSuppress: true,
         audioInterruption: AudioInterruptionMode.none,
         iosConfig: const IosRecordConfig(categoryOptions: [
@@ -530,6 +543,11 @@ class LiveSessionController extends Notifier<LiveState> {
     state = state.copyWith(partials: {...state.partials}..remove(seg));
   }
 
+  void _removeTranslating(String seg) {
+    if (!state.translating.containsKey(seg)) return;
+    state = state.copyWith(translating: {...state.translating}..remove(seg));
+  }
+
   Future<void> _translate(String sessionId, String seg, String text) async {
     final translator = _translator;
     if (translator == null) {
@@ -547,9 +565,13 @@ class LiveSessionController extends Notifier<LiveState> {
             from: _from,
             to: _to,
             context: context,
+            onDelta: (soFar) {
+              if (state.active) state = state.copyWith(translating: {...state.translating, seg: soFar});
+            },
           );
           _recent.add((text, translated));
           await _db.updateLine(sessionId, seg, LinesCompanion(translatedText: Value(translated)));
+          _removeTranslating(seg);
           _speaker?.speak(translated);
           return;
         } on OpenAiException catch (e) {
@@ -560,7 +582,13 @@ class LiveSessionController extends Notifier<LiveState> {
         await Future<void>.delayed(Duration(seconds: attempt == 0 ? 1 : 3));
       }
     } catch (e) {
-      if (state.active) state = state.copyWith(error: 'Translation failed: ${_describe(e)}');
+      _removeTranslating(seg);
+      if (state.active) {
+        state = state.copyWith(
+          untranslated: {...state.untranslated, seg},
+          error: 'Translation failed: ${_describe(e)}',
+        );
+      }
     } finally {
       _unresolved.remove(seg);
     }

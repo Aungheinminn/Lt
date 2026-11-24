@@ -31,7 +31,7 @@ class VadSpeechEnd extends VadEvent {
 /// clock as the session's WAV file.
 class Vad {
   Vad({
-    this.preRollMs = 300,
+    this.preRollMs = 500,
     this.hangoverMs = 700,
     this.maxSegmentMs = 15000,
   });
@@ -89,8 +89,11 @@ class Vad {
     final rms = _rms(frame);
     _level = _level * 0.7 + math.min(1.0, rms / 6000) * 0.3;
 
-    final startThreshold = math.max(_noiseFloor * 3, 500.0);
-    final stayThreshold = math.max(_noiseFloor * 2, 350.0);
+    // The absolute minimums only keep near-silence out. Higher ones made
+    // speech from across a room or from a TV or laptop speaker (often RMS
+    // 300-600) never start a segment, so it was silently skipped.
+    final startThreshold = math.max(_noiseFloor * 2.2, 150.0);
+    final stayThreshold = math.max(_noiseFloor * 1.5, 100.0);
 
     if (!_inSpeech) {
       _preRoll.add(frame);

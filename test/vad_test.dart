@@ -15,6 +15,26 @@ Uint8List _tone(int ms, {double amplitude = 4000}) {
 
 Uint8List _silence(int ms) => Uint8List(24 * ms * 2);
 
+/// Steady background sound with the given RMS level.
+Uint8List _noise(int ms, double rms, {int seed = 1}) {
+  final r = math.Random(seed);
+  final amp = rms * math.sqrt(3);
+  final b = ByteData(24 * ms * 2);
+  for (var i = 0; i < 24 * ms; i++) {
+    b.setInt16(i * 2, ((r.nextDouble() * 2 - 1) * amp).round(), Endian.little);
+  }
+  return b.buffer.asUint8List();
+}
+
+Uint8List _mix(Uint8List a, Uint8List b) {
+  final x = ByteData.sublistView(a), y = ByteData.sublistView(b), o = ByteData(a.length);
+  for (var i = 0; i < a.length; i += 2) {
+    final v = x.getInt16(i, Endian.little) + y.getInt16(i, Endian.little);
+    o.setInt16(i, v.clamp(-32768, 32767), Endian.little);
+  }
+  return o.buffer.asUint8List();
+}
+
 List<VadEvent> _feed(Vad vad, List<Uint8List> parts, {int chunkMs = 100}) {
   final all = BytesBuilder()..addAll(parts);
   final bytes = all.takeBytes();
@@ -36,7 +56,7 @@ void main() {
 
     final start = events.whereType<VadSpeechStart>().single;
     final end = events.whereType<VadSpeechEnd>().single;
-    expect(start.startMs, inInclusiveRange(650, 1000));
+    expect(start.startMs, inInclusiveRange(450, 1000));
     expect(start.preRoll, isNotEmpty);
     expect(end.endMs, inInclusiveRange(2400, 2800));
     expect(end.voicedMs, greaterThan(1200));
@@ -48,8 +68,28 @@ void main() {
     final start = events.whereType<VadSpeechStart>().single;
     final audioBytes = events.whereType<VadAudio>().fold<int>(0, (n, a) => n + a.bytes.length);
     final sentMs = (start.preRoll.length + audioBytes) ~/ 48;
-    expect(sentMs, lessThan(2200));
+    expect(sentMs, lessThan(2400));
     expect(sentMs, greaterThan(1000));
+  });
+
+  test('quiet or distant speech still starts a sentence', () {
+    // Amplitude 400 is RMS ~280, typical of a voice across a room.
+    final events = _feed(Vad(), [_silence(2000), _tone(2000, amplitude: 400), _silence(1500)]);
+    expect(events.whereType<VadSpeechStart>(), hasLength(1));
+    expect(events.whereType<VadSpeechEnd>(), hasLength(1));
+  });
+
+  test('speech over steady background sound is detected', () {
+    final events = _feed(Vad(), [
+      _noise(3000, 400),
+      _mix(_noise(2000, 400, seed: 2), _tone(2000, amplitude: 1200)),
+      _noise(1500, 400, seed: 3),
+    ]);
+    expect(events.whereType<VadSpeechStart>(), hasLength(1));
+  });
+
+  test('steady background sound alone does not start a sentence', () {
+    expect(_feed(Vad(), [_noise(6000, 400)]).whereType<VadSpeechStart>(), isEmpty);
   });
 
   test('silence produces no events', () {

@@ -10,12 +10,16 @@ class LiveLine extends StatelessWidget {
     required this.original,
     required this.translation,
     required this.partial,
+    this.translationSoFar,
+    this.translationFailed = false,
     required this.ended,
   });
 
   final String? original;
   final String? translation;
   final String? partial;
+  final String? translationSoFar;
+  final bool translationFailed;
 
   /// Speech for this line has stopped, so it's waiting on the transcript.
   final bool ended;
@@ -34,7 +38,7 @@ class LiveLine extends StatelessWidget {
       );
     }
 
-    final pending = translation == null;
+    final pending = translation == null && !translationFailed;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: double.infinity,
@@ -52,7 +56,11 @@ class LiveLine extends StatelessWidget {
             style: LtText.original.copyWith(color: pending ? c.ink : c.muted, fontSize: pending ? 15 : 13.5),
           ),
           const SizedBox(height: 6),
-          if (pending)
+          if (translationFailed && translation == null)
+            Text("Couldn't translate this line", style: LtText.original.copyWith(color: c.faint, fontSize: 13.5))
+          else if (pending && (translationSoFar?.isNotEmpty ?? false))
+            Text(translationSoFar!, style: LtText.translation.copyWith(color: c.ink))
+          else if (pending)
             const TypingDots(label: 'Translating')
           else
             Text(translation!, style: LtText.translation.copyWith(color: c.ink)),
